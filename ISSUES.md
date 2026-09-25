@@ -48,6 +48,10 @@ charge_limit=80
   Schlüssel im Geräteabschnitt überschreibt die Vorgabe.
 - Das Skript liest weiterhin **ein Gerät pro Prozess**. Die Datei sammelt einfach
   beliebig viele Geräte-Abschnitte (z. B. ein eigener systemd-User-Service je Gerät).
+- **Nicht enthalten:** ein Modus, der mehrere Geräte in einer Instanz überwacht.
+  Bewusste Entscheidung: Es bleibt bei einer Instanz (und einem Starter) je Gerät.
+  Damit ist aber der Normalfall, dass mehrere Instanzen gleichzeitig schreiben – siehe
+  die Sperre beim Schreiben.
 
 ### Umfang
 
@@ -79,6 +83,11 @@ Shell-Befehls ohne expliziten Parameter.
   **nie bei `--once`**. Bei jeder Speicherung eine Rückmeldung ausgeben.
 - **Atomar schreiben** (Temp-Datei + `mv`), damit parallele Instanzen keine halbe
   Datei hinterlassen; nur bei tatsächlicher Änderung schreiben.
+- **Beim Schreiben sperren** (`flock` auf eine neben der Konfiguration liegende
+  Lock-Datei, mit Timeout und sprechender Meldung): Es laufen ja bewusst mehrere
+  Instanzen gleichzeitig. Ohne Sperre kann die zuletzt schreibende Instanz den Eintrag
+  der anderen überschreiben. Gesucht wird die Datei unter der Sperre erneut einlesen,
+  geändert wird unter der Sperre, danach wird die Sperre freigegeben.
 - **Nur den betroffenen Abschnitt anfassen:** Kommentare, Reihenfolge und die
   Abschnitte anderer Geräte müssen unangetastet bleiben. Also die Datei in Zeilen
   einlesen und nur die zu ändernden Zeilen ersetzen bzw. den neuen Abschnitt am
@@ -133,3 +142,5 @@ Shell-Befehls ohne expliziten Parameter.
 - Die Auswahlliste nennt je Gerät Name, ID und gespeicherte Werte.
 - Ein Gerät mit Eintrag, das nicht erreichbar ist, erzeugt einen Hinweis; der Eintrag
   bleibt beim nächsten Start unverändert erhalten.
+- Zwei Instanzen, die gleichzeitig unterschiedliche Werte speichern, hinterlassen beide
+  Einträge: kein Eintrag geht verloren, die Datei bleibt intakt.

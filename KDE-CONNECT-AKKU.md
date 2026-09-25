@@ -186,6 +186,60 @@ Der Befehl erhält folgende Umgebungsvariablen:
 
 `--command` führt den angegebenen Text absichtlich als Shell-Befehl aus. Nur Befehle verwenden, denen man vertraut.
 
+## Starter im Anwendungsmenü
+
+`kdeconnect-battery-desktops.sh` erzeugt für jedes erreichbare Gerät einen
+`.desktop`-Eintrag, über den die Überwachung per Mausklick startet. Die
+gerätespezifischen Werte stehen dabei in der Tabelle `device_table` im Skript:
+
+```bash
+device_table=(
+    "POCO F1|"
+    "Redmi Pad SE|--charge-limit 70"
+    "POCO X3 Pro|--charge-limit 70"
+)
+```
+
+Die Zuordnung erfolgt zuerst über die Geräte-ID, danach über den Namen – beides ohne
+Beachtung der Groß-/Kleinschreibung. Was links vom `|` steht, sind beliebige weitere
+Optionen für `kdeconnect-battery.sh`; ein Gerät ohne Eintrag erhält die Standardwerte.
+Für alle Geräte gilt im Generator `--tts --tts-language de`.
+
+```bash
+# Nur ansehen, was passieren würde
+./kdeconnect-battery-desktops.sh --dry-run
+
+# Nur Geräte und ihre Optionen auflisten
+./kdeconnect-battery-desktops.sh --list
+
+# Starter erzeugen (Standard: ~/.local/share/applications)
+./kdeconnect-battery-desktops.sh
+```
+
+Weitere Optionen: `--output-dir VERZEICHNIS` für ein anderes Ziel und
+`--script PFAD`, falls `kdeconnect-battery.sh` woanders liegt. Die erzeugten Dateien
+werden mit `desktop-file-validate` geprüft; danach wird der KDE-Systembereich
+aktualisiert, sodass die Einträge im Menü erscheinen. Beenden lässt sich die
+Überwachung durch Schließen des Terminalfensters.
+
+Hinweise des Generators:
+
+- Ein Tabelleneintrag, der zu keinem erreichbaren Gerät passt, wird gemeldet.
+- Geräte mit gleichem Namen sind nicht eindeutig; die Dateinamen bekommen dann ein
+  Kürzel der Geräte-ID angehängt, und es erscheint eine Empfehlung, den
+  Tabelleneintrag auf die ID umzustellen.
+- Dateien werden überschrieben, aber nie gelöscht. Starter für Geräte, die es nicht
+  mehr gibt, bleiben deshalb liegen und müssen bei Bedarf von Hand entfernt werden.
+
+Weil jede Instanz genau ein Gerät überwacht, bleibt es auch mit Konfigurationsdatei
+bei einem Starter je Gerät. Was dann entfällt, ist die Tabelle im Generator: Die Werte
+stehen dann in der Konfiguration, und die `Exec`-Zeilen enthalten nur noch
+`--device <GERÄTE-ID>`.
+
+Wer mehrere Geräte gleichzeitig überwachen will, startet die Starter einfach
+mehrfach. Die Instanzen laufen unabhängig; nur bei der Sprachausgabe kann es zu
+Überschneidungen kommen, wenn zwei Geräte im selben Moment warnen.
+
 ## Hilfe anzeigen
 
 ```bash
