@@ -5,7 +5,8 @@
 # Ohne --command wird bei jedem Unterschreiten des Schwellenwerts nur eine
 # Meldung ausgegeben. Mit --command kann ein beliebiger Shell-Befehl ausgeführt
 # werden. Der Befehl erhält DEVICE_ID, BATTERY_LEVEL und BATTERY_CHARGING als
-# Umgebungsvariablen.
+# Umgebungsvariablen. Mit --tts kann der Status zusätzlich vorgelesen werden;
+# das TTS-Kommando erhält zusätzlich BATTERY_TEXT.
 
 set -Eeuo pipefail
 
@@ -22,13 +23,16 @@ Optionen:
   -t, --threshold PROZENT  Meldung/Aktion unterhalb dieses Wertes (Standard: 20)
   -i, --interval SEKUNDEN  Abfrageintervall (Standard: 60)
   -c, --command BEFEHL    Shell-Befehl bei niedrigem Akkustand ausführen
+      --tts               Deutsche Sprachansage bei Statusänderung aktivieren
+      --tts-every         Sprachansage bei jedem Abfrageintervall aktivieren
+      --tts-command BEFEHL  Eigenes TTS-Kommando; erhält $BATTERY_TEXT
   -1, --once              Nur einmal auslesen und beenden
   -h, --help              Diese Hilfe anzeigen
 
 Beispiele:
   ./kdeconnect-battery.sh -d 0123456789abcdef
-  ./kdeconnect-battery.sh -d 0123456789abcdef -t 25 -i 30
-  ./kdeconnect-battery.sh -d 0123456789abcdef --once
+  ./kdeconnect-battery.sh -d 0123456789abcdef --once --tts
+  ./kdeconnect-battery.sh -d 0123456789abcdef -t 25 -i 30 --tts-every
   ./kdeconnect-battery.sh -d 0123456789abcdef -t 20 \
       -c 'notify-send "KDE Connect" "Akku nur noch $BATTERY_LEVEL%"'
 EOF
@@ -39,6 +43,9 @@ threshold=20
 interval=60
 once=0
 command=""
+tts_enabled=0
+tts_every=0
+tts_command=""
 
 if (($# == 0)); then
     usage >&2
@@ -65,6 +72,21 @@ while (($# > 0)); do
         -c|--command)
             (($# >= 2)) || { echo "Fehler: $1 benötigt einen Befehl." >&2; exit 2; }
             command=$2
+            shift 2
+            ;;
+        --tts)
+            tts_enabled=1
+            shift
+            ;;
+        --tts-every)
+            tts_enabled=1
+            tts_every=1
+            shift
+            ;;
+        --tts-command)
+            (($# >= 2)) || { echo "Fehler: $1 benötigt ein TTS-Kommando." >&2; exit 2; }
+            tts_command=$2
+            tts_enabled=1
             shift 2
             ;;
         -1|--once)
@@ -127,6 +149,22 @@ if ! command -v gdbus >/dev/null 2>&1; then
     exit 1
 fi
 
+if ((tts_enabled)); then
+    if [[ -z "$tts_command" ]]; then
+        if command -v spd-say >/dev/null 2>&1; then
+            tts_command='spd-say -l de "$BATTERY_TEXT"'
+        elif command -v espeak-ng >/dev/null 2>&1; then
+            tts_command='espeak-ng -v de "$BATTERY_TEXT"'
+        elif command -v espeak >/dev/null 2>&1; then
+            tts_command='espeak -v de "$BATTERY_TEXT"'
+        else
+            echo "Fehler: Kein TTS-Programm gefunden." >&2
+            echo "Installiere z. B. espeak-ng oder verwende --tts-command." >&2
+            exit 1
+        fi
+    fi
+fi
+
 readonly object_path="/modules/kdeconnect/devices/${device_id}/battery"
 
 # gdbus gibt skalare Varianten je nach Version als "(87,)" oder
@@ -157,6 +195,29 @@ get_property() {
     printf '%s\n' "$value"
 }
 
+make_status_text() {
+    if [[ "$is_charging" == "true" ]]; then
+        printf 'Der Akku wird geladen. Akkustand %s Prozent.' "$charge"
+    elif ((charge <= threshold)); then
+        printf 'Achtung. Der Akkustand beträgt nur noch %s Prozent.' "$charge"
+    else
+        printf 'Akkustand %s Prozent.' "$charge"
+    fi
+}
+
+speak_status() {
+    local text
+    text=$(make_status_text)
+
+    if ! DEVICE_ID="$device_id" \
+        BATTERY_LEVEL="$charge" \
+        BATTERY_CHARGING="$is_charging" \
+        BATTERY_TEXT="$text" \
+        bash -c "$tts_command"; then
+        echo "TTS-Befehl ist mit einem Fehler beendet: $tts_command" >&2
+    fi
+}
+
 read_status() {
     # Die Eigenschaft "charge" ist die in allen KDE-Connect-Versionen
     # vorhandene und maßgebliche Eigenschaft. "hasBattery" ist erst in
@@ -179,6 +240,7 @@ read_status() {
 }
 
 low=0
+last_tts_key=""
 
 while true; do
     if ! read_status; then
@@ -191,6 +253,18 @@ while true; do
     fi
 
     printf '%(%F %T)T  %s%%, charging=%s\n' -1 "$charge" "$is_charging"
+
+    tts_key="${charge}:${is_charging}"
+    should_speak=0
+    if ((tts_enabled)); then
+        if ((tts_every)) || [[ "$tts_key" != "$last_tts_key" ]]; then
+            should_speak=1
+        fi
+    fi
+    if ((should_speak)); then
+        speak_status
+        last_tts_key=$tts_key
+    fi
 
     if [[ "$is_charging" == "false" ]] && ((charge <= threshold)); then
         if ((low == 0)); then

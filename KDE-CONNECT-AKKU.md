@@ -7,6 +7,7 @@
 - KDE Connect läuft auf dem Rechner und das Zielgerät ist gekoppelt.
 - Das **Battery monitor**-Plugin auf dem Zielgerät ist aktiviert.
 - `gdbus` ist installiert. Auf Debian/Ubuntu genügt dafür normalerweise `libglib2.0-bin`.
+- Für TTS wird optional `spd-say`, `espeak-ng` oder `espeak` benötigt.
 - Das Skript wird im Benutzerkontext ausgeführt, in dem auch `kdeconnectd` läuft.
 
 ## Geräte-ID ermitteln
@@ -49,6 +50,42 @@ Schwellenwert und Abfrageintervall ändern:
 ```
 
 Die Meldung wird nur einmal ausgelöst, solange der Akkustand unterhalb der Schwelle bleibt. Nach dem Laden über der Schwelle oder während des Ladens wird sie wieder zurückgesetzt.
+
+## Sprachansage (TTS)
+
+TTS ist standardmäßig deaktiviert. Mit `--tts` wird der Status beim Start und bei jeder Änderung von Ladestand oder Ladezustand auf Deutsch vorgelesen:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts
+```
+
+Bei einem niedrigen Akkustand lautet die Ansage beispielsweise:
+
+```text
+Achtung. Der Akkustand beträgt nur noch 15 Prozent.
+```
+
+Für eine einmalige Testansage:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --once --tts
+```
+
+Mit `--tts-every` wird bei jedem Abfrageintervall gesprochen. Das ist bei kurzen Intervallen entsprechend aufdringlich:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts-every --interval 60
+```
+
+Das Skript sucht automatisch nach `spd-say`, `espeak-ng` und `espeak`. Ein eigenes Kommando kann mit `--tts-command` angegeben werden. Dabei steht der vorbereitete Text in `$BATTERY_TEXT`:
+
+```bash
+./kdeconnect-battery.sh \
+    --device <GERÄTE-ID> \
+    --tts-command 'espeak-ng -v de "$BATTERY_TEXT"'
+```
+
+Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL` und `BATTERY_CHARGING`. Es wird über `bash -c` ausgeführt; nur vertrauenswürdige Befehle verwenden.
 
 ## Eigene Aktion ausführen
 
@@ -111,6 +148,21 @@ gdbus call --session \
   --object-path "/modules/kdeconnect/devices/$ID/battery" \
   --method org.freedesktop.DBus.Properties.GetAll \
   org.kde.kdeconnect.device.battery
+```
+
+## TTS-Fehlerbehebung
+
+Wenn `--tts` mit `Kein TTS-Programm gefunden` abbricht, installiere beispielsweise `espeak-ng` oder verwende ein vorhandenes Kommando:
+
+```bash
+sudo apt install espeak-ng
+```
+
+Der Audioausgabe muss zusätzlich im Benutzerkonto aktiviert sein. Mit einem eigenen Kommando kann die Ausgabe getestet werden:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --once --tts \
+    --tts-command 'espeak-ng -v de "$BATTERY_TEXT"'
 ```
 
 Das Skript liest den Akkustand des **entfernten Geräts**. Für den Akku des lokalen Rechners ist dieser D-Bus-Pfad nicht gedacht.
