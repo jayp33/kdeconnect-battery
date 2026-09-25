@@ -92,7 +92,23 @@ Das Skript sucht automatisch nach `spd-say`, `espeak-ng` und `espeak` und verwen
     --tts-command 'espeak-ng -v en-us "$BATTERY_TEXT"'
 ```
 
-Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL`, `BATTERY_CHARGING` und `BATTERY_LANGUAGE`. Es wird über `bash -c` ausgeführt; nur vertrauenswürdige Befehle verwenden.
+Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL`, `BATTERY_CHARGING`, `BATTERY_LANGUAGE` und `BATTERY_CHARGE_LIMIT`. Es wird über `bash -c` ausgeführt; nur vertrauenswürdige Befehle verwenden.
+
+## Warnung beim Erreichen eines Ladelimits
+
+Mit `--charge-limit` kann eine Ladewarnung aktiviert werden. Die Warnung erscheint, wenn das Gerät noch lädt und der Ladestand den angegebenen Wert erreicht oder überschreitet:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --charge-limit 80
+```
+
+`--charge-limit` aktiviert die TTS-Ausgabe automatisch. Die englische Ansage lautet beispielsweise:
+
+```text
+Warning. The battery is at 80 percent or higher and is still charging. You can stop charging now.
+```
+
+Die Warnung wird pro Episode nur einmal ausgegeben. Sie wird zurückgesetzt, wenn das Gerät vom Ladegerät getrennt wird oder der Ladestand wieder unterhalb des Limits liegt. Mit `--tts-every` wird sie bei jedem Abfrageintervall wiederholt. Das Skript beendet das Laden nicht selbst, sondern informiert lediglich über den erreichten Grenzwert.
 
 ## Eigene Aktion ausführen
 

@@ -27,6 +27,7 @@ Optionen:
       --tts-every         Sprachansage bei jedem Abfrageintervall aktivieren
       --tts-language SPRACHE  Sprache für Ansage und Stimme (Standard: en)
       --tts-command BEFEHL  Eigenes TTS-Kommando; erhält $BATTERY_TEXT
+      --charge-limit PROZENT  Warnung beim Laden ab diesem Stand (Standard: aus)
   -1, --once              Nur einmal auslesen und beenden
   -h, --help              Diese Hilfe anzeigen
 
@@ -34,6 +35,7 @@ Beispiele:
   ./kdeconnect-battery.sh -d 0123456789abcdef
   ./kdeconnect-battery.sh -d 0123456789abcdef --once --tts
   ./kdeconnect-battery.sh -d 0123456789abcdef --tts --tts-language en-GB
+  ./kdeconnect-battery.sh -d 0123456789abcdef --tts --charge-limit 80
   ./kdeconnect-battery.sh -d 0123456789abcdef -t 25 -i 30 --tts-every
   ./kdeconnect-battery.sh -d 0123456789abcdef -t 20 \
       -c 'notify-send "KDE Connect" "Akku nur noch $BATTERY_LEVEL%"'
@@ -49,6 +51,7 @@ tts_enabled=0
 tts_every=0
 tts_language="en"
 tts_command=""
+charge_limit=0
 
 if (($# == 0)); then
     usage >&2
@@ -96,6 +99,14 @@ while (($# > 0)); do
             (($# >= 2)) || { echo "Fehler: $1 benötigt ein TTS-Kommando." >&2; exit 2; }
             tts_command=$2
             tts_enabled=1
+            shift 2
+            ;;
+        --charge-limit)
+            (($# >= 2)) || { echo "Fehler: $1 benötigt einen Prozentwert." >&2; exit 2; }
+            charge_limit=$2
+            if [[ "$charge_limit" != "0" ]]; then
+                tts_enabled=1
+            fi
             shift 2
             ;;
         -1|--once)
@@ -154,6 +165,11 @@ fi
 
 if ! [[ "${tts_language,,}" =~ ^(en|de)([-_][A-Za-z0-9]+)?$ ]]; then
     echo "Fehler: --tts-language unterstützt z. B. en, en-GB, de oder de-DE." >&2
+    exit 2
+fi
+
+if ! [[ "$charge_limit" =~ ^(0|[1-9][0-9]*)$ ]] || ((charge_limit > 100)); then
+    echo "Fehler: --charge-limit muss 0 (aus) oder eine Zahl von 1 bis 100 sein." >&2
     exit 2
 fi
 
@@ -240,18 +256,30 @@ make_status_text() {
     fi
 }
 
-speak_status() {
-    local text
-    text=$(make_status_text)
+make_charge_warning_text() {
+    if [[ "${tts_language,,}" == de* ]]; then
+        printf 'Achtung. Der Akku ist zu %s Prozent oder mehr geladen und lädt noch. Du kannst das Laden jetzt beenden.' "$charge_limit"
+    else
+        printf 'Warning. The battery is at %s percent or higher and is still charging. You can stop charging now.' "$charge_limit"
+    fi
+}
+
+speak_text() {
+    local text=$1
 
     if ! DEVICE_ID="$device_id" \
         BATTERY_LEVEL="$charge" \
         BATTERY_CHARGING="$is_charging" \
         BATTERY_LANGUAGE="$tts_language" \
+        BATTERY_CHARGE_LIMIT="$charge_limit" \
         BATTERY_TEXT="$text" \
         bash -c "$tts_command"; then
         echo "TTS-Befehl ist mit einem Fehler beendet: $tts_command" >&2
     fi
+}
+
+speak_status() {
+    speak_text "$(make_status_text)"
 }
 
 read_status() {
@@ -276,6 +304,7 @@ read_status() {
 }
 
 low=0
+charge_warning_active=0
 last_tts_key=""
 
 while true; do
@@ -291,8 +320,28 @@ while true; do
     printf '%(%F %T)T  %s%%, charging=%s\n' -1 "$charge" "$is_charging"
 
     tts_key="${charge}:${is_charging}"
+    charge_warning_now=0
+    if ((charge_limit > 0)) && [[ "$is_charging" == "true" ]] && ((charge >= charge_limit)); then
+        charge_warning_now=1
+    fi
+
+    if ((charge_warning_now)); then
+        if ((charge_warning_active == 0)); then
+            charge_warning_active=1
+            printf 'Ladewarnung: Das Akku ist bei %s%% oder höher und lädt noch.\n' "$charge"
+            if ((tts_enabled)); then
+                speak_text "$(make_charge_warning_text)"
+                last_tts_key=$tts_key
+            fi
+        elif ((tts_enabled == 1 && tts_every == 1)); then
+            speak_text "$(make_charge_warning_text)"
+        fi
+    else
+        charge_warning_active=0
+    fi
+
     should_speak=0
-    if ((tts_enabled)); then
+    if ((tts_enabled == 1 && charge_warning_now == 0)); then
         if ((tts_every)) || [[ "$tts_key" != "$last_tts_key" ]]; then
             should_speak=1
         fi
