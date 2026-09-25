@@ -133,13 +133,13 @@ Ein anderes Limit kann mit `--charge-limit` angegeben werden:
 
 Mit `--charge-limit 0` wird die Überladewarnung deaktiviert. Ein explizit gesetzter Wert größer als 0 aktiviert die TTS-Ausgabe automatisch.
 
-Die englische Ansage lautet beispielsweise:
+Die englische Ansage nennt den aktuellen Ladestand und das Limit, zum Beispiel:
 
 ```text
-Warning. The battery is at 80 percent or higher and is still charging. You can stop charging now.
+Warning. The battery is at 85 percent, above the 80 percent limit, and is still charging. You can stop charging now.
 ```
 
-Die Warnung wird pro Episode nur einmal ausgegeben. Sie wird zurückgesetzt, wenn das Gerät vom Ladegerät getrennt wird oder der Ladestand wieder unterhalb des Limits liegt. Mit `--tts-every` wird sie bei jedem Abfrageintervall wiederholt. Das Skript beendet das Laden nicht selbst, sondern informiert lediglich über den erreichten Grenzwert.
+Die Terminalmeldung erscheint pro Episode einmal. Wird die Warnung wiederholt, nennt jede Ansage den jeweils aktuellen Ladestand: mit `--tts-every` bei jedem Abfrageintervall, mit `--tts-every-percent` bei jeder Änderung des Prozentwerts. Die Warnung wird zurückgesetzt, wenn das Gerät vom Ladegerät getrennt wird oder der Ladestand wieder unterhalb des Limits liegt. Das Skript beendet das Laden nicht selbst, sondern informiert lediglich über den erreichten Grenzwert.
 
 Die Unterladewarnung nutzt dagegen `--threshold` (Standard: 20 Prozent). Mit `--threshold 0` wird sie deaktiviert. So lassen sich beide Warnungen unabhängig kombinieren:
 

@@ -337,9 +337,9 @@ make_status_text() {
 
 make_charge_warning_text() {
     if [[ "${tts_language,,}" == de* ]]; then
-        printf 'Achtung. Der Akku ist zu %s Prozent oder mehr geladen und lädt noch. Du kannst das Laden jetzt beenden.' "$charge_limit"
+        printf 'Achtung. Der Akku ist bei %s Prozent, über dem Ladelimit von %s Prozent, und lädt noch. Du kannst das Laden jetzt beenden.' "$charge" "$charge_limit"
     else
-        printf 'Warning. The battery is at %s percent or higher and is still charging. You can stop charging now.' "$charge_limit"
+        printf 'Warning. The battery is at %s percent, above the %s percent limit, and is still charging. You can stop charging now.' "$charge" "$charge_limit"
     fi
 }
 
@@ -415,6 +415,7 @@ read_status() {
 
 low=0
 charge_warning_active=0
+last_charge_warning_charge=""
 last_tts_charge=""
 charge=""
 is_charging=""
@@ -489,17 +490,25 @@ while true; do
     if ((charge_warning_now)); then
         if ((charge_warning_active == 0)); then
             charge_warning_active=1
-            printf 'Ladewarnung: Der Akku ist bei %s%% oder höher und lädt noch.\n' "$charge"
+            printf 'Ladewarnung: Der Akku ist bei %s%% (Ladelimit: %s%%) und lädt noch.\n' "$charge" "$charge_limit"
             if ((tts_enabled)); then
                 speak_text "$(make_charge_warning_text)"
                 last_tts_charge=$charge
+                last_charge_warning_charge=$charge
             fi
         elif ((tts_enabled == 1 && tts_every == 1)); then
             speak_text "$(make_charge_warning_text)"
             last_tts_charge=$charge
+            last_charge_warning_charge=$charge
+        elif ((tts_enabled == 1 && tts_every_percent == 1)) &&
+            [[ -z "$last_charge_warning_charge" || "$charge" != "$last_charge_warning_charge" ]]; then
+            speak_text "$(make_charge_warning_text)"
+            last_tts_charge=$charge
+            last_charge_warning_charge=$charge
         fi
     else
         charge_warning_active=0
+        last_charge_warning_charge=""
     fi
 
     should_speak=0
