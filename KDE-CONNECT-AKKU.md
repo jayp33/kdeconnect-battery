@@ -70,22 +70,28 @@ Die Meldung wird nur einmal ausgelöst, solange der Akkustand unterhalb der Schw
 
 ## Sprachansage (TTS)
 
-TTS ist standardmäßig deaktiviert. Mit `--tts` wird der Status beim Start und bei jeder Änderung von Ladestand oder Ladezustand standardmäßig auf Englisch vorgelesen:
+TTS ist standardmäßig deaktiviert. Mit `--tts` werden standardmäßig nur Warnungen vorgelesen: Unterladewarnungen, Überladewarnungen und Verbindungsänderungen. Normale Statusansagen werden nicht gesprochen.
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --tts
 ```
 
-Bei einem niedrigen Akkustand lautet die englische Ansage beispielsweise:
+Bei einem niedrigen Akkustand lautet die englische Warnansage beispielsweise:
 
 ```text
 Warning. The battery level is only 15 percent.
 ```
 
-Für eine einmalige Testansage:
+Die Unterladewarnung wird gesprochen, wenn der Gerätestatus in den Warnbereich wechselt. Ein kurzer Test funktioniert mit:
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --once --tts
+```
+
+Mit `--tts-every-percent` werden zusätzlich normale Statusansagen beim ersten Ablesen und bei jeder Änderung des Prozentwerts ausgegeben. Ein Wechsel des Ladezustands allein genügt dabei nicht:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts-every-percent
 ```
 
 Die Standardsprache ist Englisch. Eine britische Stimme oder Deutsch kann mit `--tts-language` ausgewählt werden:
@@ -113,19 +119,37 @@ Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL`, `BATTERY_CHARGI
 
 ## Warnung beim Erreichen eines Ladelimits
 
-Mit `--charge-limit` kann eine Ladewarnung aktiviert werden. Die Warnung erscheint, wenn das Gerät noch lädt und der Ladestand den angegebenen Wert erreicht oder überschreitet:
+Das Ladelimit ist standardmäßig auf 80 Prozent gesetzt. Die Überladewarnung erscheint, wenn das Gerät noch lädt und der Ladestand 80 Prozent oder mehr beträgt:
 
 ```bash
-./kdeconnect-battery.sh --device <GERÄTE-ID> --charge-limit 80
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts
 ```
 
-`--charge-limit` aktiviert die TTS-Ausgabe automatisch. Die englische Ansage lautet beispielsweise:
+Ein anderes Limit kann mit `--charge-limit` angegeben werden:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts --charge-limit 90
+```
+
+Mit `--charge-limit 0` wird die Überladewarnung deaktiviert. Ein explizit gesetzter Wert größer als 0 aktiviert die TTS-Ausgabe automatisch.
+
+Die englische Ansage lautet beispielsweise:
 
 ```text
 Warning. The battery is at 80 percent or higher and is still charging. You can stop charging now.
 ```
 
 Die Warnung wird pro Episode nur einmal ausgegeben. Sie wird zurückgesetzt, wenn das Gerät vom Ladegerät getrennt wird oder der Ladestand wieder unterhalb des Limits liegt. Mit `--tts-every` wird sie bei jedem Abfrageintervall wiederholt. Das Skript beendet das Laden nicht selbst, sondern informiert lediglich über den erreichten Grenzwert.
+
+Die Unterladewarnung nutzt dagegen `--threshold` (Standard: 20 Prozent). Mit `--threshold 0` wird sie deaktiviert. So lassen sich beide Warnungen unabhängig kombinieren:
+
+```bash
+# Nur Unterladewarnung
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts --charge-limit 0 --threshold 15
+
+# Beide Warnungen
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts --threshold 15 --charge-limit 80
+```
 
 ## Verbindungsfehler
 
