@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
 # Liest den Akkustand eines über KDE Connect gekoppelten Geräts über D-Bus.
+# Ohne --device wird eine Geräteliste angezeigt und interaktiv ausgewählt.
 #
 # Ohne --command wird bei jedem Unterschreiten des Schwellenwerts nur eine
 # Meldung ausgegeben. Mit --command kann ein beliebiger Shell-Befehl ausgeführt
@@ -18,6 +19,9 @@ usage() {
 Verwendung:
   kdeconnect-battery.sh [OPTIONEN] [GERÄTE-ID]
 
+Ohne --device wird eine Liste der verfügbaren Geräte angezeigt und es kann
+eines interaktiv ausgewählt werden.
+
 Optionen:
   -d, --device ID          KDE-Connect-Geräte-ID (alternativ positional)
   -t, --threshold PROZENT  Meldung/Aktion unterhalb dieses Wertes (Standard: 20)
@@ -32,6 +36,8 @@ Optionen:
   -h, --help              Diese Hilfe anzeigen
 
 Beispiele:
+  ./kdeconnect-battery.sh
+  ./kdeconnect-battery.sh --once
   ./kdeconnect-battery.sh -d 0123456789abcdef
   ./kdeconnect-battery.sh -d 0123456789abcdef --once --tts
   ./kdeconnect-battery.sh -d 0123456789abcdef --tts --tts-language en-GB
@@ -40,6 +46,69 @@ Beispiele:
   ./kdeconnect-battery.sh -d 0123456789abcdef -t 20 \
       -c 'notify-send "KDE Connect" "Akku nur noch $BATTERY_LEVEL%"'
 EOF
+}
+
+select_device() {
+    local output line id name selection count index
+    local -a device_ids=()
+    local -a device_names=()
+
+    if ! command -v kdeconnect-cli >/dev/null 2>&1; then
+        echo "Fehler: kdeconnect-cli wurde nicht gefunden." >&2
+        echo "Ohne --device wird es für die Geräteauswahl benötigt." >&2
+        return 1
+    fi
+
+    if ! output=$(kdeconnect-cli --list-available --id-name-only 2>&1); then
+        echo "Fehler: Die Liste der KDE-Connect-Geräte konnte nicht abgerufen werden." >&2
+        [[ -n "$output" ]] && printf '%s\n' "$output" >&2
+        return 1
+    fi
+
+    while IFS= read -r line; do
+        line=${line%$'\r'}
+        [[ -n "$line" ]] || continue
+        if [[ "$line" =~ ^([^[:space:]]+)[[:space:]]*(.*)$ ]]; then
+            id=${BASH_REMATCH[1]}
+            name=${BASH_REMATCH[2]}
+            [[ -n "$name" ]] || name="(ohne Namen)"
+            device_ids+=("$id")
+            device_names+=("$name")
+        fi
+    done <<< "$output"
+
+    count=${#device_ids[@]}
+    if ((count == 0)); then
+        echo "Keine erreichbaren KDE-Connect-Geräte gefunden." >&2
+        echo "Prüfe die Kopplung mit kdeconnect-cli --list-available." >&2
+        return 1
+    fi
+
+    echo "Verfügbare KDE-Connect-Geräte:"
+    for ((index = 0; index < count; index++)); do
+        printf '  %d) %s (ID: %s)\n' \
+            "$((index + 1))" "${device_names[index]}" "${device_ids[index]}"
+    done
+
+    if [[ ! -t 0 ]]; then
+        echo "Keine interaktive Auswahl möglich. Bitte --device <GERÄTE-ID> angeben." >&2
+        return 1
+    fi
+
+    if ! read -r -p "Gerät auswählen [1-$count, Enter = 1]: " selection; then
+        echo "Auswahl abgebrochen." >&2
+        return 1
+    fi
+    [[ -n "$selection" ]] || selection=1
+
+    if ! [[ "$selection" =~ ^[1-9][0-9]*$ ]] || ((selection > count)); then
+        echo "Ungültige Auswahl: $selection" >&2
+        return 1
+    fi
+
+    index=$((selection - 1))
+    device_id=${device_ids[index]}
+    printf 'Ausgewähltes Gerät: %s (%s)\n' "${device_names[index]}" "$device_id"
 }
 
 device_id=""
@@ -52,11 +121,6 @@ tts_every=0
 tts_language="en"
 tts_command=""
 charge_limit=0
-
-if (($# == 0)); then
-    usage >&2
-    exit 2
-fi
 
 while (($# > 0)); do
     case "$1" in
@@ -148,9 +212,7 @@ if (($# > 0)); then
 fi
 
 if [[ -z "$device_id" ]]; then
-    echo "Es wurde keine Geräte-ID angegeben." >&2
-    usage >&2
-    exit 2
+    select_device || exit $?
 fi
 
 if ! [[ "$threshold" =~ ^[0-9]+$ ]] || ((threshold < 0 || threshold > 100)); then

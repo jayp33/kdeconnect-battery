@@ -7,18 +7,35 @@
 - KDE Connect läuft auf dem Rechner und das Zielgerät ist gekoppelt.
 - Das **Battery monitor**-Plugin auf dem Zielgerät ist aktiviert.
 - `gdbus` ist installiert. Auf Debian/Ubuntu genügt dafür normalerweise `libglib2.0-bin`.
+- Für die automatische Geräteauswahl ohne `--device` wird zusätzlich `kdeconnect-cli` benötigt.
 - Für TTS wird optional `spd-say`, `espeak-ng` oder `espeak` benötigt.
 - Das Skript wird im Benutzerkontext ausgeführt, in dem auch `kdeconnectd` läuft.
 
-## Geräte-ID ermitteln
+## Gerät auswählen
 
-Die ID wird mit folgendem Befehl angezeigt:
+Wird das Skript ohne `--device` gestartet, fragt es automatisch die erreichbaren KDE-Connect-Geräte ab und zeigt eine nummerierte Liste:
 
 ```bash
-kdeconnect-cli -l --id-name-only
+./kdeconnect-battery.sh
 ```
 
-Der erste Teil jeder Zeile ist die ID, die das Skript benötigt. Bei mehreren Geräten sollte die ID ausdrücklich angegeben werden.
+Beispiel:
+
+```text
+Verfügbare KDE-Connect-Geräte:
+  1) POCO F1 (ID: ...)
+  2) Redmi Pad SE (ID: ...)
+  3) POCO X3 Pro (ID: ...)
+Gerät auswählen [1-3, Enter = 1]:
+```
+
+Die Eingabe `1`, `2` oder `3` wählt das entsprechende Gerät aus. Eine leere Eingabe wählt das erste Gerät. Für nicht-interaktive Aufrufe, Cronjobs oder Skripte sollte weiterhin `--device <GERÄTE-ID>` angegeben werden.
+
+Die Liste lässt sich auch manuell abfragen:
+
+```bash
+kdeconnect-cli --list-available --id-name-only
+```
 
 ## Einmaliger Status
 
