@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Attrappe für --command: protokolliert die Umgebungsvariablen.
+printf '%s\t%s\t%s\n' "${DEVICE_ID:-}" "${BATTERY_LEVEL:-}" "${BATTERY_CHARGING:-}" >> "$COMMAND_LOG"

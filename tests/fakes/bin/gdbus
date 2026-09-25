@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+#
+# Attrappe für gdbus. Jede Zeile in FAKE_GDBUS_SCRIPT beschreibt eine Abfrage
+# im Format "<charge> <isCharging>". Statt einer Zahl stehen dort die
+# Schlüsselwörter FAIL (gdbus meldet einen Fehler) oder GARBAGE (unerwartete
+# Antwort). Ohne FAKE_GDBUS_PLAIN lautet die Antwort "(<wert>,)", sonst
+# "(wert,)".
+
+object_path=""
+for argument in "$@"; do
+    case "$argument" in
+        /modules/kdeconnect/devices/*) object_path=$argument ;;
+    esac
+done
+property=${!#}
+
+poll=$(<"$FAKE_GDBUS_COUNT")
+if [[ ${property,,} == charge ]]; then
+    wanted=$((poll + 1))
+else
+    wanted=$poll
+fi
+
+line=""
+if ((wanted > 0)) && [[ -s $FAKE_GDBUS_SCRIPT ]]; then
+    line=$(sed -n "${wanted}p" "$FAKE_GDBUS_SCRIPT")
+fi
+
+if [[ -z $line ]]; then
+    # Alle Zeilen verbraucht: das Skript beenden, damit ein Test mit
+    # Endlosschleife nicht hängen bleibt. Die PID des Skripts steht in
+    # FAKE_GDBUS_STOP_PID; die Testumgebung schreibt sie unmittelbar nach dem
+    # Start. Es wird gewartet, bis das Skript wirklich beendet ist: Solange
+    # die Attrappe läuft, bleibt die Pipe offen und das Skript könnte noch eine
+    # Antwort verarbeiten, die es gar nicht gibt, und würde sie als
+    # Verbindungsfehler melden. Ein beendeter Prozess steht noch eine Weile als
+    # "Zombie" im Prozessverzeichnis, deshalb wird dort der Zustand gelesen und
+    # nicht mit "kill -0" geprüft.
+    pid=""
+    for ((attempt = 0; attempt < 40; attempt++)); do
+        if [[ -s ${FAKE_GDBUS_STOP_PID:-} ]]; then
+            pid=$(<"$FAKE_GDBUS_STOP_PID")
+            break
+        fi
+        sleep 0.05
+    done
+
+    if [[ -n $pid ]]; then
+        kill -KILL "$pid" 2>/dev/null
+        for ((attempt = 0; attempt < 100; attempt++)); do
+            state=""
+            if [[ -r /proc/$pid/stat ]]; then
+                info=$(<"/proc/$pid/stat" 2>/dev/null)
+                state=${info##*") "}
+                state=${state%% *}
+            fi
+            [[ -z $state || $state == Z ]] && break
+            sleep 0.05
+        done
+    fi
+    exit 1
+fi
+
+printf '%s\t%s\n' "$object_path" "$property" >> "$FAKE_GDBUS_LOG"
+printf '%s' "$wanted" > "$FAKE_GDBUS_COUNT"
+
+if [[ $line == *' '* ]]; then
+    charge_value=${line%% *}
+    charging_value=${line#* }
+else
+    charge_value=$line
+    charging_value=false
+fi
+
+if [[ ${property,,} == charge ]]; then
+    value=$charge_value
+else
+    value=$charging_value
+fi
+
+if [[ $value == FAIL ]]; then
+    printf 'Error org.freedesktop.DBus.Error.ServiceUnknown: Der Name org.kde.kdeconnect wurde nicht angeboten\n' >&2
+    exit 1
+fi
+if [[ $value == GARBAGE ]]; then
+    printf 'hallo\n'
+    exit 0
+fi
+if [[ ${FAKE_GDBUS_PLAIN:-0} == 1 ]]; then
+    printf '(%s,)\n' "$value"
+else
+    printf '(<%s>,)\n' "$value"
+fi

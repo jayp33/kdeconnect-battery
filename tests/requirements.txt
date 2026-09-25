@@ -1,0 +1,5 @@
+# Testabhängigkeiten. Installation in ein eigenes venv:
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r tests/requirements.txt
+pytest>=8.0
+pytest-timeout>=2.3

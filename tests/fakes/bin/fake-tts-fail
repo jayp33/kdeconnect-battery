@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Attrappe für ein TTS-Kommando, das scheitert.
+printf 'Absichtlicher TTS-Fehler\n' >&2
+exit 4

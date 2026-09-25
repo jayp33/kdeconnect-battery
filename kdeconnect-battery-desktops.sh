@@ -61,7 +61,9 @@ slugify() {
     while [[ $text == *--* ]]; do
         text=${text//--/-}
     done
-    printf '%s' "${text%-}"
+    text=${text#-}
+    text=${text%-}
+    printf '%s' "$text"
 }
 
 # Eindeutigen Dateinamen vergeben. Namen sind nicht eindeutig, deshalb wird bei
@@ -70,7 +72,7 @@ declare -A used_slugs=()
 declare -a slugs=()
 assign_slugs() {
     declare -A counts=()
-    local index slug compact length candidate
+    local index slug compact length candidate suffix
     for index in "${!device_names[@]}"; do
         slug=$(slugify "${device_names[$index]}")
         counts[$slug]=$(( ${counts[$slug]:-0} + 1 ))
@@ -84,9 +86,18 @@ assign_slugs() {
         if (( ${counts[$slug]} > 1 )); then
             candidate="$slug-${compact:0:$length}"
         fi
+        # Bei einem Namenskonflikt wird das Kürzel der ID verlängert. Ist die
+        # ID ausgeschöpft oder beginnen zwei IDs gleich, wird eine laufende
+        # Nummer angehängt, damit die Suche immer endet.
+        suffix=1
         while [[ -n ${used_slugs[$candidate]:-} ]]; do
-            length=$((length + 2))
-            candidate="$slug-${compact:0:$length}"
+            if ((length < ${#compact})); then
+                length=$((length + 2))
+                candidate="$slug-${compact:0:$length}"
+            else
+                candidate="$slug-$compact-$suffix"
+                ((suffix += 1))
+            fi
         done
         used_slugs[$candidate]=1
         slugs+=("$candidate")

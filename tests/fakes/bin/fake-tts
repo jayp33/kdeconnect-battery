@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Attrappe für --tts-command: protokolliert Text und Umgebungsvariablen.
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "${BATTERY_TEXT:-}" "${BATTERY_LEVEL:-}" "${BATTERY_CHARGING:-}" \
+    "${BATTERY_LANGUAGE:-}" "${BATTERY_CHARGE_LIMIT:-}" \
+    "${BATTERY_CONNECTION:-}" "${DEVICE_ID:-}" >> "$TTS_LOG"

@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+# Harte Zeitbegrenzung pro Test: Ein hängendes Skript darf die Suite nie blockieren.
+timeout = 120
+markers = [
+    "loop: Tests mit Endlosschleife (je 1 bis 4 Sekunden)",
+]

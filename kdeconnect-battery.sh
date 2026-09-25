@@ -129,6 +129,10 @@ while (($# > 0)); do
     case "$1" in
         -d|--device)
             (($# >= 2)) || { echo "Fehler: $1 benötigt eine Geräte-ID." >&2; exit 2; }
+            if [[ -n "$device_id" ]]; then
+                echo "Fehler: Mehrere Geräte-IDs angegeben." >&2
+                exit 2
+            fi
             device_id=$2
             shift 2
             ;;
@@ -280,17 +284,23 @@ readonly object_path="/modules/kdeconnect/devices/${device_id}/battery"
 
 # gdbus gibt skalare Varianten je nach Version als "(87,)" oder
 # "(<87>,)" aus. Die folgende Funktion entfernt diese GVariant-Verpackung.
+# Sie unterscheidet zwei Fehlerarten: Wenn die Abfrage selbst scheitert, ist das
+# Gerät nicht erreichbar (last_error_is_connection=1). Antwortet gdbus, ist die
+# Antwort aber unlesbar, dann wird diese mit der Originalantwort gemeldet, weil
+# das sonst wie ein Verbindungsproblem aussieht und die Ursache verbirgt.
 get_property() {
     local property=$1
     local response value
 
     last_error=""
+    last_error_is_connection=0
     if ! response=$(gdbus call --session \
         --dest "$DBUS_SERVICE" \
         --object-path "$object_path" \
         --method org.freedesktop.DBus.Properties.Get \
         "$DBUS_INTERFACE" "$property" 2>&1); then
         last_error="D-Bus-Abfrage von '$property' fehlgeschlagen: $response"
+        last_error_is_connection=1
         return 1
     fi
 
@@ -387,14 +397,14 @@ read_status() {
 
     if ! get_property charge; then
         read_error=$last_error
-        read_error_is_connection=1
+        read_error_is_connection=$last_error_is_connection
         return 1
     fi
     charge=$GET_PROPERTY_VALUE
 
     if ! get_property isCharging; then
         read_error=$last_error
-        read_error_is_connection=1
+        read_error_is_connection=$last_error_is_connection
         return 1
     fi
     is_charging=$GET_PROPERTY_VALUE
@@ -421,6 +431,7 @@ charge=""
 is_charging=""
 GET_PROPERTY_VALUE=""
 last_error=""
+last_error_is_connection=0
 read_error=""
 read_error_is_connection=0
 connection_state="unknown"

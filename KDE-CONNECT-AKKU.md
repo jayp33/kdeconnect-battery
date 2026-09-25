@@ -248,7 +248,7 @@ mehrfach. Die Instanzen laufen unabhängig; nur bei der Sprachausgabe kann es zu
 
 ## Fehlerbehebung
 
-Wenn das Skript `KDE-Connect-Gerät ist nicht erreichbar` meldet, `charge=-1` anzeigt oder ein anderes D-Bus-Problem auftritt:
+Wenn das Skript `KDE-Connect-Gerät ist nicht erreichbar` meldet, `charge=-1` anzeigt oder eine `Unerwartete Antwort von gdbus für …` schreibt:
 
 1. Mit `kdeconnect-cli -l` prüfen, ob das Gerät noch gekoppelt und erreichbar ist.
 2. Auf dem Zielgerät prüfen, ob der Battery monitor aktiviert ist.
@@ -300,3 +300,32 @@ Der Audioausgabe muss zusätzlich im Benutzerkonto aktiviert sein. Mit einem eig
 ```
 
 Das Skript liest den Akkustand des **entfernten Geräts**. Für den Akku des lokalen Rechners ist dieser D-Bus-Pfad nicht gedacht.
+
+## Tests
+
+Beide Skripte sind mit einer Testsuite abgesichert. Sie braucht nur Python mit `pytest`; Hilfsprogramme wie `gdbus`, `kdeconnect-cli` oder Sprachausgabe liefert die Suite selbst als Attrappen mit (`tests/fakes/bin`). Jeder Test läuft in einem eigenen temporären Verzeichnis mit eigenem `PATH` und eigenem `HOME`. Weder echte Geräte noch die Benutzerumgebung können ein Testergebnis beeinflussen, und kein Test erzeugt Ton.
+
+```bash
+python3 -m venv .venv                              # einmalig
+.venv/bin/pip install -r tests/requirements.txt     # einmalig
+.venv/bin/pytest                                   # alle Tests
+
+.venv/bin/pytest tests/test_battery.py             # nur eine Datei
+.venv/bin/pytest -k ladewarnung                    # nur Tests, deren Name das Muster enthält
+.venv/bin/pytest -m loop                           # nur die Tests mit Endlosschleife
+```
+
+| Datei | Inhalt |
+| --- | --- |
+| `tests/harness.py` | Die Klasse `Sandbox`: Verzeichnisse, Umgebung, Attrappen, Skriptaufrufe |
+| `tests/conftest.py` | Die Fixture `sandbox` |
+| `tests/fakes/bin/` | Attrappen als ausführbare Shell-Skripte |
+| `tests/test_battery.py` | `kdeconnect-battery.sh`: Optionen, D-Bus-Auswertung, Warnungen, Sprachausgabe, Geräteauswahl, Schleife |
+| `tests/test_desktops.py` | `kdeconnect-battery-desktops.sh`: Hilfe, Geräteliste, erzeugte Dateien, Wertetabelle, Dateinamen, Start der erzeugten Befehle |
+| `tests/test_regressions.py` | Fehler, die schon einmal aufgetreten sind, mit dem Grund im Kommentar |
+
+Die Suite läuft in etwa anderthalb Minuten. Der größte Teil davon entsteht durch die Tests mit Endlosschleife: Sie warten im Abstand von einer Sekunde mehrere Abfragen ab, um Wiederholungen und Zustandswechsel zu prüfen.
+
+`pyproject.toml` setzt eine harte Zeitbegrenzung von 120 Sekunden je Test. Ein Skript, das sich nicht beendet, lässt den Test scheitern statt den ganzen Lauf aufzuhängen.
+
+Die Prüfung der erzeugten Desktop-Dateien mit `desktop-file-validate` wird übersprungen, falls das Programm fehlt.

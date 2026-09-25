@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Attrappe für kdeconnect-cli: beantwortet --list-available --id-name-only.
+if [[ ${FAKE_KDE_FAIL:-0} != 0 ]]; then
+    printf 'KDE Connect laeuft nicht\n' >&2
+    exit 1
+fi
+if [[ -f ${FAKE_KDE_DEVICES:-} ]]; then
+    cat "$FAKE_KDE_DEVICES"
+fi
+exit 0

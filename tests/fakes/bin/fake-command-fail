@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Attrappe für ein --command, das scheitert.
+printf 'Absichtlicher Fehler\n' >&2
+exit 3
