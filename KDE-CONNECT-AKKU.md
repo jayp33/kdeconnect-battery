@@ -53,16 +53,16 @@ Die Meldung wird nur einmal ausgelöst, solange der Akkustand unterhalb der Schw
 
 ## Sprachansage (TTS)
 
-TTS ist standardmäßig deaktiviert. Mit `--tts` wird der Status beim Start und bei jeder Änderung von Ladestand oder Ladezustand auf Deutsch vorgelesen:
+TTS ist standardmäßig deaktiviert. Mit `--tts` wird der Status beim Start und bei jeder Änderung von Ladestand oder Ladezustand standardmäßig auf Englisch vorgelesen:
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --tts
 ```
 
-Bei einem niedrigen Akkustand lautet die Ansage beispielsweise:
+Bei einem niedrigen Akkustand lautet die englische Ansage beispielsweise:
 
 ```text
-Achtung. Der Akkustand beträgt nur noch 15 Prozent.
+Warning. The battery level is only 15 percent.
 ```
 
 Für eine einmalige Testansage:
@@ -71,21 +71,28 @@ Für eine einmalige Testansage:
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --once --tts
 ```
 
+Die Standardsprache ist Englisch. Eine britische Stimme oder Deutsch kann mit `--tts-language` ausgewählt werden:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts --tts-language en-GB
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts --tts-language de
+```
+
 Mit `--tts-every` wird bei jedem Abfrageintervall gesprochen. Das ist bei kurzen Intervallen entsprechend aufdringlich:
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --tts-every --interval 60
 ```
 
-Das Skript sucht automatisch nach `spd-say`, `espeak-ng` und `espeak`. Ein eigenes Kommando kann mit `--tts-command` angegeben werden. Dabei steht der vorbereitete Text in `$BATTERY_TEXT`:
+Das Skript sucht automatisch nach `spd-say`, `espeak-ng` und `espeak` und verwendet dabei die gewählte Sprache. Ein eigenes Kommando kann mit `--tts-command` angegeben werden. Dabei steht der vorbereitete Text in `$BATTERY_TEXT`:
 
 ```bash
 ./kdeconnect-battery.sh \
     --device <GERÄTE-ID> \
-    --tts-command 'espeak-ng -v de "$BATTERY_TEXT"'
+    --tts-command 'espeak-ng -v en-us "$BATTERY_TEXT"'
 ```
 
-Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL` und `BATTERY_CHARGING`. Es wird über `bash -c` ausgeführt; nur vertrauenswürdige Befehle verwenden.
+Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL`, `BATTERY_CHARGING` und `BATTERY_LANGUAGE`. Es wird über `bash -c` ausgeführt; nur vertrauenswürdige Befehle verwenden.
 
 ## Eigene Aktion ausführen
 
@@ -162,7 +169,7 @@ Der Audioausgabe muss zusätzlich im Benutzerkonto aktiviert sein. Mit einem eig
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --once --tts \
-    --tts-command 'espeak-ng -v de "$BATTERY_TEXT"'
+    --tts-command 'espeak-ng -v en-us "$BATTERY_TEXT"'
 ```
 
 Das Skript liest den Akkustand des **entfernten Geräts**. Für den Akku des lokalen Rechners ist dieser D-Bus-Pfad nicht gedacht.

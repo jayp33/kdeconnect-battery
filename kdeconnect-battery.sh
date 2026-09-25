@@ -23,8 +23,9 @@ Optionen:
   -t, --threshold PROZENT  Meldung/Aktion unterhalb dieses Wertes (Standard: 20)
   -i, --interval SEKUNDEN  Abfrageintervall (Standard: 60)
   -c, --command BEFEHL    Shell-Befehl bei niedrigem Akkustand ausführen
-      --tts               Deutsche Sprachansage bei Statusänderung aktivieren
+      --tts               Sprachansage bei Statusänderung aktivieren
       --tts-every         Sprachansage bei jedem Abfrageintervall aktivieren
+      --tts-language SPRACHE  Sprache für Ansage und Stimme (Standard: en)
       --tts-command BEFEHL  Eigenes TTS-Kommando; erhält $BATTERY_TEXT
   -1, --once              Nur einmal auslesen und beenden
   -h, --help              Diese Hilfe anzeigen
@@ -32,6 +33,7 @@ Optionen:
 Beispiele:
   ./kdeconnect-battery.sh -d 0123456789abcdef
   ./kdeconnect-battery.sh -d 0123456789abcdef --once --tts
+  ./kdeconnect-battery.sh -d 0123456789abcdef --tts --tts-language en-GB
   ./kdeconnect-battery.sh -d 0123456789abcdef -t 25 -i 30 --tts-every
   ./kdeconnect-battery.sh -d 0123456789abcdef -t 20 \
       -c 'notify-send "KDE Connect" "Akku nur noch $BATTERY_LEVEL%"'
@@ -45,6 +47,7 @@ once=0
 command=""
 tts_enabled=0
 tts_every=0
+tts_language="en"
 tts_command=""
 
 if (($# == 0)); then
@@ -82,6 +85,12 @@ while (($# > 0)); do
             tts_enabled=1
             tts_every=1
             shift
+            ;;
+        --tts-language)
+            (($# >= 2)) || { echo "Fehler: $1 benötigt eine Sprache." >&2; exit 2; }
+            tts_language=$2
+            tts_enabled=1
+            shift 2
             ;;
         --tts-command)
             (($# >= 2)) || { echo "Fehler: $1 benötigt ein TTS-Kommando." >&2; exit 2; }
@@ -143,6 +152,11 @@ if ! [[ "$interval" =~ ^[1-9][0-9]*$ ]]; then
     exit 2
 fi
 
+if ! [[ "${tts_language,,}" =~ ^(en|de)([-_][A-Za-z0-9]+)?$ ]]; then
+    echo "Fehler: --tts-language unterstützt z. B. en, en-GB, de oder de-DE." >&2
+    exit 2
+fi
+
 if ! command -v gdbus >/dev/null 2>&1; then
     echo "Fehler: gdbus wurde nicht gefunden." >&2
     echo "Installiere auf Debian/Ubuntu z. B. das Paket libglib2.0-bin." >&2
@@ -150,13 +164,24 @@ if ! command -v gdbus >/dev/null 2>&1; then
 fi
 
 if ((tts_enabled)); then
+    tts_voice=${tts_language,,}
+    tts_voice=${tts_voice//_/-}
+    case "$tts_voice" in
+        en)
+            tts_voice="en-us"
+            ;;
+        de|de-*)
+            tts_voice="de"
+            ;;
+    esac
+
     if [[ -z "$tts_command" ]]; then
         if command -v spd-say >/dev/null 2>&1; then
-            tts_command='spd-say -l de "$BATTERY_TEXT"'
+            tts_command="spd-say -l $tts_voice \"\$BATTERY_TEXT\""
         elif command -v espeak-ng >/dev/null 2>&1; then
-            tts_command='espeak-ng -v de "$BATTERY_TEXT"'
+            tts_command="espeak-ng -v $tts_voice \"\$BATTERY_TEXT\""
         elif command -v espeak >/dev/null 2>&1; then
-            tts_command='espeak -v de "$BATTERY_TEXT"'
+            tts_command="espeak -v $tts_voice \"\$BATTERY_TEXT\""
         else
             echo "Fehler: Kein TTS-Programm gefunden." >&2
             echo "Installiere z. B. espeak-ng oder verwende --tts-command." >&2
@@ -196,12 +221,22 @@ get_property() {
 }
 
 make_status_text() {
-    if [[ "$is_charging" == "true" ]]; then
-        printf 'Der Akku wird geladen. Akkustand %s Prozent.' "$charge"
-    elif ((charge <= threshold)); then
-        printf 'Achtung. Der Akkustand beträgt nur noch %s Prozent.' "$charge"
+    if [[ "${tts_language,,}" == de* ]]; then
+        if [[ "$is_charging" == "true" ]]; then
+            printf 'Der Akku wird geladen. Akkustand %s Prozent.' "$charge"
+        elif ((charge <= threshold)); then
+            printf 'Achtung. Der Akkustand beträgt nur noch %s Prozent.' "$charge"
+        else
+            printf 'Akkustand %s Prozent.' "$charge"
+        fi
     else
-        printf 'Akkustand %s Prozent.' "$charge"
+        if [[ "$is_charging" == "true" ]]; then
+            printf 'The battery is charging. The battery level is %s percent.' "$charge"
+        elif ((charge <= threshold)); then
+            printf 'Warning. The battery level is only %s percent.' "$charge"
+        else
+            printf 'The battery level is %s percent.' "$charge"
+        fi
     fi
 }
 
@@ -212,6 +247,7 @@ speak_status() {
     if ! DEVICE_ID="$device_id" \
         BATTERY_LEVEL="$charge" \
         BATTERY_CHARGING="$is_charging" \
+        BATTERY_LANGUAGE="$tts_language" \
         BATTERY_TEXT="$text" \
         bash -c "$tts_command"; then
         echo "TTS-Befehl ist mit einem Fehler beendet: $tts_command" >&2
