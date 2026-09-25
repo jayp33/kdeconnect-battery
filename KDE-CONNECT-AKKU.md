@@ -109,7 +109,7 @@ Das Skript sucht automatisch nach `spd-say`, `espeak-ng` und `espeak` und verwen
     --tts-command 'espeak-ng -v en-us "$BATTERY_TEXT"'
 ```
 
-Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL`, `BATTERY_CHARGING`, `BATTERY_LANGUAGE` und `BATTERY_CHARGE_LIMIT`. Es wird über `bash -c` ausgeführt; nur vertrauenswürdige Befehle verwenden.
+Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL`, `BATTERY_CHARGING`, `BATTERY_LANGUAGE`, `BATTERY_CHARGE_LIMIT` und `BATTERY_CONNECTION` (`connected` oder `disconnected`). Es wird über `bash -c` ausgeführt; nur vertrauenswürdige Befehle verwenden.
 
 ## Warnung beim Erreichen eines Ladelimits
 
@@ -126,6 +126,22 @@ Warning. The battery is at 80 percent or higher and is still charging. You can s
 ```
 
 Die Warnung wird pro Episode nur einmal ausgegeben. Sie wird zurückgesetzt, wenn das Gerät vom Ladegerät getrennt wird oder der Ladestand wieder unterhalb des Limits liegt. Mit `--tts-every` wird sie bei jedem Abfrageintervall wiederholt. Das Skript beendet das Laden nicht selbst, sondern informiert lediglich über den erreichten Grenzwert.
+
+## Verbindungsfehler
+
+Wenn das Gerät während der Überwachung nicht mehr erreichbar ist, wird die technische D-Bus-Fehlermeldung nicht mehr bei jeder Abfrage ausgegeben. Stattdessen erscheint eine kurze Meldung mit dem nächsten Versuchszeitpunkt:
+
+```text
+2026-09-25 13:00:23  KDE-Connect-Gerät ist nicht erreichbar. Der nächste Versuch erfolgt in 60 Sekunden.
+```
+
+Während TTS aktiviert ist, wird der Verbindungsverlust einmal zusätzlich vorgelesen:
+
+```text
+The connection to the device was lost. I will try again.
+```
+
+Nach einer erfolgreichen Abfrage erscheint eine Wiederherstellungsmeldung; auch diese wird bei aktivem TTS einmal gesprochen. Wiederholte Fehlversuche bleiben ohne zusätzliche Sprachansage, bis die Verbindung wiederhergestellt ist. Für eine deutsche Sprachausgabe kann `--tts-language de` verwendet werden.
 
 ## Eigene Aktion ausführen
 
@@ -154,7 +170,7 @@ Der Befehl erhält folgende Umgebungsvariablen:
 
 ## Fehlerbehebung
 
-Wenn das Skript `No such object`, `charge=-1` oder ein anderes D-Bus-Fehler meldet:
+Wenn das Skript `KDE-Connect-Gerät ist nicht erreichbar` meldet, `charge=-1` anzeigt oder ein anderes D-Bus-Problem auftritt:
 
 1. Mit `kdeconnect-cli -l` prüfen, ob das Gerät noch gekoppelt und erreichbar ist.
 2. Auf dem Zielgerät prüfen, ob der Battery monitor aktiviert ist.

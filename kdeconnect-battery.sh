@@ -276,17 +276,18 @@ get_property() {
     local property=$1
     local response value
 
+    last_error=""
     if ! response=$(gdbus call --session \
         --dest "$DBUS_SERVICE" \
         --object-path "$object_path" \
         --method org.freedesktop.DBus.Properties.Get \
         "$DBUS_INTERFACE" "$property" 2>&1); then
-        echo "D-Bus-Abfrage von '$property' fehlgeschlagen: $response" >&2
+        last_error="D-Bus-Abfrage von '$property' fehlgeschlagen: $response"
         return 1
     fi
 
     if [[ ! "$response" =~ ^\((.*)\)$ ]]; then
-        echo "Unerwartete Antwort von gdbus für $property: $response" >&2
+        last_error="Unerwartete Antwort von gdbus für $property: $response"
         return 1
     fi
 
@@ -295,7 +296,7 @@ get_property() {
     if [[ ${value:0:1} == "<" && ${value: -1} == ">" ]]; then
         value=${value:1:${#value}-2}
     fi
-    printf '%s\n' "$value"
+    GET_PROPERTY_VALUE=$value
 }
 
 make_status_text() {
@@ -326,14 +327,31 @@ make_charge_warning_text() {
     fi
 }
 
+make_connection_lost_text() {
+    if [[ "${tts_language,,}" == de* ]]; then
+        printf 'Die Verbindung zum Gerät wurde unterbrochen. Ich versuche es erneut.'
+    else
+        printf 'The connection to the device was lost. I will try again.'
+    fi
+}
+
+make_connection_restored_text() {
+    if [[ "${tts_language,,}" == de* ]]; then
+        printf 'Die Verbindung zum Gerät ist wiederhergestellt.'
+    else
+        printf 'The connection to the device has been restored.'
+    fi
+}
+
 speak_text() {
     local text=$1
 
     if ! DEVICE_ID="$device_id" \
-        BATTERY_LEVEL="$charge" \
-        BATTERY_CHARGING="$is_charging" \
+        BATTERY_LEVEL="${charge:-}" \
+        BATTERY_CHARGING="${is_charging:-}" \
         BATTERY_LANGUAGE="$tts_language" \
         BATTERY_CHARGE_LIMIT="$charge_limit" \
+        BATTERY_CONNECTION="$connection_state" \
         BATTERY_TEXT="$text" \
         bash -c "$tts_command"; then
         echo "TTS-Befehl ist mit einem Fehler beendet: $tts_command" >&2
@@ -348,19 +366,33 @@ read_status() {
     # Die Eigenschaft "charge" ist die in allen KDE-Connect-Versionen
     # vorhandene und maßgebliche Eigenschaft. "hasBattery" ist erst in
     # neueren Versionen vorhanden und darf hier nicht vorausgesetzt werden.
-    charge=$(get_property charge) || return 1
-    is_charging=$(get_property isCharging) || return 1
+    read_error=""
+    read_error_is_connection=0
+
+    if ! get_property charge; then
+        read_error=$last_error
+        read_error_is_connection=1
+        return 1
+    fi
+    charge=$GET_PROPERTY_VALUE
+
+    if ! get_property isCharging; then
+        read_error=$last_error
+        read_error_is_connection=1
+        return 1
+    fi
+    is_charging=$GET_PROPERTY_VALUE
 
     if [[ "$charge" == "-1" ]]; then
-        echo "Für dieses Gerät wurde noch kein gültiger Akkustand gemeldet (charge=-1)." >&2
+        read_error="Für dieses Gerät wurde noch kein gültiger Akkustand gemeldet (charge=-1)."
         return 1
     fi
     if ! [[ "$charge" =~ ^[0-9]+$ ]] || ((charge > 100)); then
-        echo "Ungültiger Akkustand: $charge" >&2
+        read_error="KDE-Connect hat einen ungültigen Akkustand gemeldet: $charge"
         return 1
     fi
     if [[ "$is_charging" != "true" && "$is_charging" != "false" ]]; then
-        echo "Ungültiger Ladezustand: $is_charging" >&2
+        read_error="KDE-Connect hat einen ungültigen Ladezustand gemeldet: $is_charging"
         return 1
     fi
 }
@@ -368,15 +400,45 @@ read_status() {
 low=0
 charge_warning_active=0
 last_tts_key=""
+charge=""
+is_charging=""
+GET_PROPERTY_VALUE=""
+last_error=""
+read_error=""
+read_error_is_connection=0
+connection_state="unknown"
 
 while true; do
     if ! read_status; then
-        echo "KDE-Connect-Akkuinformationen konnten nicht gelesen werden." >&2
+        if ((read_error_is_connection)); then
+            if [[ "$connection_state" != "disconnected" ]]; then
+                connection_state="disconnected"
+                low=0
+                charge_warning_active=0
+                printf '%(%F %T)T  KDE-Connect-Gerät ist nicht erreichbar. Der nächste Versuch erfolgt in %s Sekunden.\n' -1 "$interval"
+                if ((tts_enabled)); then
+                    speak_text "$(make_connection_lost_text)"
+                fi
+            fi
+        else
+            printf '%(%F %T)T  %s\n' -1 "${read_error:-KDE-Connect-Akkuinformationen konnten nicht gelesen werden.}"
+        fi
         if ((once)); then
             exit 1
         fi
         sleep "$interval"
         continue
+    fi
+
+    if [[ "$connection_state" == "disconnected" ]]; then
+        connection_state="connected"
+        last_tts_key="${charge}:${is_charging}"
+        printf '%(%F %T)T  Verbindung zum Gerät wiederhergestellt.\n' -1
+        if ((tts_enabled)); then
+            speak_text "$(make_connection_restored_text)"
+        fi
+    elif [[ "$connection_state" == "unknown" ]]; then
+        connection_state="connected"
     fi
 
     printf '%(%F %T)T  %s%%, charging=%s\n' -1 "$charge" "$is_charging"
