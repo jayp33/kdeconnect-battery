@@ -9,6 +9,7 @@
 - `gdbus` ist installiert. Auf Debian/Ubuntu genügt dafür normalerweise `libglib2.0-bin`.
 - Für die automatische Geräteauswahl ohne `--device` wird zusätzlich `kdeconnect-cli` benötigt.
 - Für TTS wird optional `spd-say`, `espeak-ng` oder `espeak` benötigt.
+- Für eine neutralere Stimme kann stattdessen der Dienst aus [`tts/`](tts/README.md) verwendet werden. Er bringt zusätzlich `curl`, `pw-play` und rund 430 MB Modelldatei mit.
 - Das Skript wird im Benutzerkontext ausgeführt, in dem auch `kdeconnectd` läuft.
 
 ## Gerät auswählen
@@ -118,6 +119,26 @@ Das Skript sucht automatisch nach `spd-say`, `espeak-ng` und `espeak` und verwen
 ```
 
 Das TTS-Kommando erhält außerdem `DEVICE_ID`, `BATTERY_LEVEL`, `BATTERY_CHARGING`, `BATTERY_LANGUAGE`, `BATTERY_CHARGE_LIMIT` und `BATTERY_CONNECTION` (`connected` oder `disconnected`). Es wird über `bash -c` ausgeführt; nur vertrauenswürdige Befehle verwenden.
+
+### Neutrale Stimme mit audio.cpp
+
+`espeak-ng` klingt synthetisch. Wer eine deutlich natürlichere Stimme möchte,
+ohne Python oder eine GPU einzusetzen, kann [audio.cpp](https://github.com/0xShug0/audio.cpp)
+mit dem Modell Supertonic 3 als lokalen Dienst betreiben. Das Skript bleibt
+dabei unverändert, die Anbindung läuft vollständig über `--tts-command`.
+
+Die vollständige Anleitung mit Installation, Prüfsummen und Diensteinrichtung
+steht in [`tts/README.md`](tts/README.md). Kurzfassung:
+
+```bash
+./kdeconnect-battery.sh --device <GERÄTE-ID> --tts --tts-language de \
+  --tts-command 'curl -sS --retry-connrefused --retry 5 --retry-delay 1 --retry-all-errors -X POST http://127.0.0.1:8099/v1/audio/speech -H "Content-Type: application/json" -d "{\"model\":\"supertonic-3\",\"input\":\"$BATTERY_TEXT\",\"voice\":\"M1\",\"language\":\"$BATTERY_LANGUAGE\",\"response_format\":\"wav\"}" -o "$XDG_RUNTIME_DIR/kdc-tts-$DEVICE_ID.wav" && pw-play "$XDG_RUNTIME_DIR/kdc-tts-$DEVICE_ID.wav"'
+```
+
+Beides gleichzeitig geht nicht sinnvoll: ist `--tts-command` gesetzt, wird die
+Automatik aus `spd-say`/`espeak-ng`/`espeak` nicht mehr verwendet. Fällt der
+Dienst aus, meldet das Skript den Fehler und läuft unter `--tts` ohne Stimme
+weiter.
 
 ## Warnung beim Erreichen eines Ladelimits
 

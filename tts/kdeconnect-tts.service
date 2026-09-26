@@ -1,0 +1,24 @@
+[Unit]
+Description=Supertonic 3 TTS für kdeconnect-battery (audio.cpp)
+Documentation=https://github.com/0xShug0/audio.cpp
+ConditionUser=!root
+# Das Modell liegt 312 MiB groß auf der Platte und braucht beim Laden rund
+# 4,8 s. Fehlt es oder ist es unlesbar, ist ein Neustart zwecklos. Nach drei
+# Versuchen in fünf Minuten bleibt der Dienst stehend, statt endlos zu laufen.
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=exec
+Slice=session.slice
+ExecStart=%h/.local/opt/kdeconnect-battery-tts/audiocpp_server --config %h/.config/kdeconnect-battery-tts/server.json
+Restart=on-failure
+RestartSec=2
+
+# Übernommen von pipewire.service. Getestet, siehe tts/README.md.
+LockPersonality=yes
+NoNewPrivileges=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=default.target
