@@ -85,12 +85,23 @@ def test_fehlender_parameterwert(sandbox, three, args, message):
 
 
 def test_liste_zeigt_geraete_und_optionen(sandbox, three):
-    result = sandbox.run_desktops("--list")
+    # Eigene Tabelle: Geprüft wird die Formatierung der Liste, nicht der Inhalt
+    # der Tabelle im Skript. Die dort eingetragenen Geräte und Optionen sind
+    # Konfiguration und ändern sich; die Liste selbst nicht.
+    variant = sandbox.generator_variant(
+        '"POCO F1|"',
+        '"Redmi Pad SE|--charge-limit 70"',
+        '"POCO X3 Pro|--charge-limit 70 --tts-command /pfad/kdeconnect-speak"',
+    )
+    result = sandbox.run(variant, "--script", str(BATTERY_SCRIPT), "--list")
 
     assert result.status == 0, result.describe()
     assert f"POCO F1 ({ID1})  Standardwerte" in result.stdout, result.describe()
     assert f"Redmi Pad SE ({ID2})  Optionen: --charge-limit 70" in result.stdout, result.describe()
-    assert f"POCO X3 Pro ({ID3})  Optionen: --charge-limit 70" in result.stdout, result.describe()
+    assert (
+        f"POCO X3 Pro ({ID3})  Optionen: --charge-limit 70 --tts-command /pfad/kdeconnect-speak"
+        in result.stdout
+    ), result.describe()
 
 
 def test_liste_schreibt_keine_dateien(sandbox, three, out):
@@ -154,7 +165,12 @@ def test_erzeugt_eine_datei_je_geraet(sandbox, three, out):
 
 
 def test_dateiinhalt_ist_vollstaendig(sandbox, three, out):
-    result = sandbox.run_desktops("-o", str(out))
+    variant = sandbox.generator_variant(
+        '"POCO F1|"',
+        '"Redmi Pad SE|--charge-limit 70"',
+        '"POCO X3 Pro|--charge-limit 70"',
+    )
+    result = sandbox.run(variant, "--script", str(BATTERY_SCRIPT), "-o", str(out))
     assert result.status == 0, result.describe()
 
     file = out / "kdeconnect-akku-redmi-pad-se.desktop"
@@ -185,8 +201,34 @@ def test_exec_zeile_ohne_prozentzeichen(sandbox, three, out):
         assert "%" not in read(file), f"Prozentzeichen in {file.name}"
 
 
+def test_tts_befehl_bleibt_ein_argument(sandbox, three, out):
+    """Ein TTS-Skript muss als einzelnes Argument ankommen.
+
+    Die Exec-Zeile wird nicht von einer Shell interpretiert, sondern an
+    Leerzeichen getrennt. Ein Pfad darf deshalb nicht in Anführungszeichen
+    gesetzt werden; ein ausgeschriebener curl-Aufruf mit Leerzeichen käme
+    hier gar nicht erst an.
+    """
+    variant = sandbox.generator_variant('"POCO F1|--tts-command /opt/tts/kdeconnect-speak"')
+    result = sandbox.run(variant, "--script", str(BATTERY_SCRIPT), "-o", str(out))
+    assert result.status == 0, result.describe()
+
+    content = read(out / "kdeconnect-akku-poco-f1.desktop")
+    exec_line = next(line for line in content.splitlines() if line.startswith("Exec="))
+    argv = exec_line[len("Exec="):].split()
+
+    assert argv[argv.index("--tts-command") + 1] == "/opt/tts/kdeconnect-speak"
+    assert "'" not in exec_line, "Hochkomma in der Exec-Zeile"
+    assert '"' not in exec_line, "Anführungszeichen in der Exec-Zeile"
+
+
 def test_standardwerte_ohne_optionshinweis(sandbox, three, out):
-    result = sandbox.run_desktops("-o", str(out))
+    variant = sandbox.generator_variant(
+        '"POCO F1|"',
+        '"Redmi Pad SE|--charge-limit 70"',
+        '"POCO X3 Pro|--charge-limit 70"',
+    )
+    result = sandbox.run(variant, "--script", str(BATTERY_SCRIPT), "-o", str(out))
     assert result.status == 0, result.describe()
 
     content = read(out / "kdeconnect-akku-poco-f1.desktop")

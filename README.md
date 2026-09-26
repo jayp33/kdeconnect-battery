@@ -135,6 +135,11 @@ steht in [`tts/README.md`](tts/README.md). Kurzfassung:
   --tts-command 'curl -sS --retry-connrefused --retry 5 --retry-delay 1 --retry-all-errors -X POST http://127.0.0.1:8099/v1/audio/speech -H "Content-Type: application/json" -d "{\"model\":\"supertonic-3\",\"input\":\"$BATTERY_TEXT\",\"voice\":\"M1\",\"language\":\"$BATTERY_LANGUAGE\",\"response_format\":\"wav\"}" -o "$XDG_RUNTIME_DIR/kdc-tts-$DEVICE_ID.wav" && pw-play "$XDG_RUNTIME_DIR/kdc-tts-$DEVICE_ID.wav"'
 ```
 
+In `.desktop`-Startern geht dieser direkte Aufruf nicht: die `Exec=`-Zeile wird
+nicht von einer Shell interpretiert und macht aus dem Befehl eine ungültige
+Datei. Dafür gibt es `tts/kdeconnect-speak`, das als `--tts-command` nur seinen
+eigenen Pfad bekommt. Siehe [`.desktop-Starter`](tts/README.md#in-einem-desktop-starter).
+
 Beides gleichzeitig geht nicht sinnvoll: ist `--tts-command` gesetzt, wird die
 Automatik aus `spd-say`/`espeak-ng`/`espeak` nicht mehr verwendet. Fällt der
 Dienst aus, meldet das Skript den Fehler und läuft unter `--tts` ohne Stimme

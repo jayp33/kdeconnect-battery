@@ -23,10 +23,15 @@ base_args=(--tts --tts-language de)
 # Ohne eigenen Eintrag bekommt ein Gerät die Standardwerte. Die Zuordnung erfolgt
 # zuerst über die Geräte-ID, danach über den Namen (beides ohne Beachtung der
 # Groß-/Kleinschreibung). Beispiel: "Redmi Pad SE|--charge-limit 70"
+#
+# $tts_befehl verweist auf das Sprachskript aus tts/kdeconnect-speak. Der
+# curl-Aufruf selbst kann nicht in einer Exec-Zeile stehen, weil die nicht von
+# einer Shell interpretiert wird. Siehe tts/README.md.
+tts_befehl="--tts-command $HOME/.local/bin/kdeconnect-speak"
 device_table=(
-    "POCO F1|"
-    "Redmi Pad SE|--charge-limit 70"
-    "POCO X3 Pro|--charge-limit 70"
+    "POCO F1|$tts_befehl"
+    "Redmi Pad SE|--charge-limit 70 $tts_befehl"
+    "POCO X3 Pro|--charge-limit 70 $tts_befehl"
 )
 
 # --- Hilfsfunktionen ---------------------------------------------------------

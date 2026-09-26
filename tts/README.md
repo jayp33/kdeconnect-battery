@@ -94,7 +94,7 @@ steht in `server.json` nur `models`, und der Symlink legt genau dieses
 Verzeichnis neben die Konfigurationsdatei. So bleibt die Datei im Repository
 und auf dem Rechner identisch.
 
-### 4. Dienst
+### 4. Dienste
 
 ```sh
 install -m644 tts/kdeconnect-tts.service ~/.config/systemd/user/kdeconnect-tts.service
@@ -102,7 +102,19 @@ systemctl --user daemon-reload
 systemctl --user enable --now kdeconnect-tts.service
 ```
 
+### 5. Sprachskript
+
+```sh
+install -Dm755 tts/kdeconnect-speak ~/.local/bin/kdeconnect-speak
+```
+
+Das Skript ist für den Aufruf als `--tts-command` gedacht, also für alle Fälle,
+in denen der Befehl in einer `.desktop`-Zeile steht. Auf der Kommandozeile
+genügt auch der direkte curl-Aufruf, siehe unten.
+
 ## Verwendung im Skript
+
+### Auf der Kommandozeile
 
 ```sh
 kdeconnect-battery.sh --tts --tts-language de \
@@ -129,6 +141,57 @@ Zu den vier Bestandteilen:
 - **Kein `jq`, keine Zeilenumbrüche.** Die Projekttexte enthalten keine
   Anführungszeichen und keine Backslashes, die direkte JSON-Interpolation ist
   deshalb sicher. Umlaute kommen als UTF-8 durch, geprüft.
+
+### In einem .desktop-Starter
+
+Hier ist der direkte curl-Aufruf **nicht** möglich. Die `Exec=`-Zeile wird nicht
+von einer Shell interpretiert, sondern nach der Desktop-Entry-Spezifikation
+geparst: Leerzeichen trennen Argumente, `"` öffnet einen zitierten Abschnitt,
+`\` maskiert das nächste Zeichen, und `%` muss als `%%` geschrieben werden.
+Ein für die Shell geschriebener Befehl ist dort eine ungültige Datei.
+
+Nachgemessen mit beiden Varianten, `gio launch` auf eine erzeugte Testdatei:
+
+| Variante | Ergebnis |
+|---|---|
+| curl-Aufruf in `Exec` | `gio` verweigert die Datei: *„Informationen zur Anwendung können nicht geladen werden“* |
+| Pfad zu `kdeconnect-speak` | startet, erzeugt 410.600 B WAV |
+
+`desktop-file-validate` meldet für die erste Variante vier Fehler, darunter
+*„reserved character `'` outside of a quote"* und dreimal *„non-escaped
+character `$` in a quote, but it should be escaped with two backslashes"*.
+Die zweite Variante ist fehlerfrei.
+
+Deshalb gehört in die Starter nur der Pfad:
+
+```bash
+# in kdeconnect-battery-desktops.sh, damit nicht jedes Gerät es wiederholen muss
+tts_befehl="--tts-command $HOME/.local/bin/kdeconnect-speak"
+device_table=(
+    "POCO F1|$tts_befehl"
+    "Redmi Pad SE|--charge-limit 70 $tts_befehl"
+    "POCO X3 Pro|--charge-limit 70 $tts_befehl"
+)
+```
+
+Die Einträge müssen doppelt in Anführungszeichen stehen, damit die Variable
+beim Erzeugen der Starter expandiert wird. Anschließend die Starter neu
+erzeugen, sonst behalten die alten Dateien weiterhin nur `--tts --tts-language de`
+und damit `espeak-ng`.
+
+**Achtung, nicht erreichbare Geräte:** Der Generator schreibt nur Einträge für
+Geräte, die gerade erreichbar sind, und meldet die übrigen Tabellenzeilen als
+*Hinweis*. Ein ausgefallenes Gerät behält damit seine alte Datei und deren alte
+Argumente. Nach einer Umstellung also jede `.desktop`-Datei prüfen, nicht nur die
+neu geschriebenen:
+
+```sh
+grep -L tts-command ~/.local/share/applications/kdeconnect-akku-*.desktop
+```
+
+Findet die Datei noch einen alten Stand, lässt sie sich von Hand auf denselben
+Stand bringen, den der Generator schreiben würde, oder das Gerät später
+erreichbar machen und den Generator erneut laufen lassen.
 
 ## Verhalten
 

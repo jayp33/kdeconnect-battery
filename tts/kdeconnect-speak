@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Sprachausgabe für kdeconnect-battery über den lokalen audio.cpp-Dienst.
+#
+# Wird als --tts-command übergeben. kdeconnect-battery.sh führt den Befehl mit
+# "bash -c" aus und stellt dabei BATTERY_TEXT, BATTERY_LANGUAGE, DEVICE_ID
+# und die übrigen Felder als Umgebung bereit.
+#
+# Warum ein eigenes Skript und nicht der curl-Aufruf direkt: In der Exec-Zeile
+# eines .desktop-Starters wird der Wert nicht von einer Shell interpretiert.
+# Leerzeichen, ", \, & und $ müssten dort einzeln maskiert werden, und schon
+# ein einfaches Hochkomma lässt die Datei ungültig werden. Hier bleibt der
+# JSON-Ausdruck lesbar. Auf der Kommandozeile funktioniert auch der direkte
+# Aufruf, siehe tts/README.md.
+
+set -u
+
+out="$XDG_RUNTIME_DIR/kdc-tts-${DEVICE_ID:-unknown}.wav"
+
+curl -sS --retry-connrefused --retry 5 --retry-delay 1 --retry-all-errors \
+    -X POST http://127.0.0.1:8099/v1/audio/speech \
+    -H "Content-Type: application/json" \
+    -d "{\"model\":\"supertonic-3\",\"input\":\"$BATTERY_TEXT\",\"voice\":\"M1\",\"language\":\"$BATTERY_LANGUAGE\",\"response_format\":\"wav\"}" \
+    -o "$out" || exit 1
+
+pw-play "$out"
