@@ -3,7 +3,7 @@
 # Erzeugt .desktop-Starter für kdeconnect-battery.sh – einen Eintrag je Gerät.
 #
 # Jede Instanz überwacht genau ein Gerät, also braucht es weiterhin einen Starter je
-# Gerät. Solange es die Konfigurationsdatei aus ISSUES.md #1 nicht gibt, stehen die
+# Gerät. Solange es die Konfigurationsdatei aus Issue #2 nicht gibt, stehen die
 # gerätespezifischen Werte in der Tabelle unten im Skript; danach übernimmt die
 # Konfiguration diese Werte und die Tabelle entfällt.
 
