@@ -1,7 +1,7 @@
 # Testsuite
 
 Tests für `kdeconnect-battery.sh` und `kdeconnect-battery-desktops.sh`.
-163 Tests in drei Dateien, ein Lauf dauert etwa anderthalb Minuten.
+167 Tests in drei Dateien, ein Lauf dauert etwa anderthalb Minuten.
 
 ## Ausführen
 

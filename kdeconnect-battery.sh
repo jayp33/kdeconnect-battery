@@ -7,7 +7,9 @@
 # Meldung ausgegeben. Mit --command kann ein beliebiger Shell-Befehl ausgeführt
 # werden. Der Befehl erhält DEVICE_ID, BATTERY_LEVEL und BATTERY_CHARGING als
 # Umgebungsvariablen. Mit --tts kann der Status zusätzlich vorgelesen werden;
-# das TTS-Kommando erhält zusätzlich BATTERY_TEXT.
+# das TTS-Kommando erhält zusätzlich BATTERY_TEXT. Warnungen werden dabei
+# standardmäßig bei jeder Änderung des Prozentwerts wiederholt, mit --tts-every
+# bei jedem Abfrageintervall.
 
 set -Eeuo pipefail
 
@@ -21,6 +23,10 @@ Verwendung:
 
 Ohne --device wird eine Liste der verfügbaren Geräte angezeigt und es kann
 eines interaktiv ausgewählt werden.
+
+Warnungen werden beim Eintritt in den Warnzustand gesprochen und danach bei
+jeder Änderung des Prozentwerts wiederholt. Mit --tts-every werden sie bei
+jedem Abfrageintervall wiederholt, auch ohne Änderung des Prozentwerts.
 
 Optionen:
   -d, --device ID          KDE-Connect-Geräte-ID (alternativ positional)
@@ -326,19 +332,18 @@ make_low_warning_text() {
 }
 
 make_status_text() {
+    # Die Unterladewarnung erscheint hier bewusst nicht: Solange ihre
+    # Bedingung gilt, spricht der Warnblock in der Hauptschleife, und die
+    # normale Statusansage ist für genau diese Fälle gesperrt.
     if [[ "${tts_language,,}" == de* ]]; then
         if [[ "$is_charging" == "true" ]]; then
             printf 'Der Akku wird geladen. Akkustand %s Prozent.' "$charge"
-        elif ((threshold > 0 && charge <= threshold)); then
-            make_low_warning_text
         else
             printf 'Akkustand %s Prozent.' "$charge"
         fi
     else
         if [[ "$is_charging" == "true" ]]; then
             printf 'The battery is charging. The battery level is %s percent.' "$charge"
-        elif ((threshold > 0 && charge <= threshold)); then
-            make_low_warning_text
         else
             printf 'The battery level is %s percent.' "$charge"
         fi
@@ -425,6 +430,7 @@ read_status() {
 
 low=0
 charge_warning_active=0
+last_low_warning_charge=""
 last_charge_warning_charge=""
 last_tts_charge=""
 charge=""
@@ -443,6 +449,8 @@ while true; do
                 connection_state="disconnected"
                 low=0
                 charge_warning_active=0
+                last_low_warning_charge=""
+                last_charge_warning_charge=""
                 printf '%(%F %T)T  KDE-Connect-Gerät ist nicht erreichbar. Der nächste Versuch erfolgt in %s Sekunden.\n' -1 "$interval"
                 if ((tts_enabled)); then
                     speak_text "$(make_connection_lost_text)"
@@ -471,57 +479,77 @@ while true; do
 
     printf '%(%F %T)T  %s%%, charging=%s\n' -1 "$charge" "$is_charging"
 
-    # Die Unterladewarnung wird nur beim Eintritt in den Warnzustand gesprochen.
+    # Warnungen. Beide melden den Eintritt in den Warnzustand auf der Konsole
+    # und sprechen ihn. Danach wird standardmäßig bei jeder Änderung des
+    # Prozentwerts erneut gesprochen: Der Ladestand steht über eine Minute
+    # still, die Warnung wäre nach der ersten Ansage längst verklungen, und
+    # gerade während einer langen Episode ist der aktuelle Stand interessant.
+    # --tts-every wiederholt stattdessen bei jedem Abfrageintervall.
+    #
+    # low_warning_now und charge_warning_now halten nur fest, ob die Bedingung
+    # gerade gilt. Gesprochen wird ausschließlich im zugehörigen Warnblock, und
+    # der Eintritt wird über low_entered und charge_warning_entered erkannt.
+
+    # Unterladewarnung
     low_warning_now=0
     if [[ "$is_charging" == "false" ]] && ((threshold > 0 && charge <= threshold)); then
+        low_warning_now=1
+    fi
+
+    if ((low_warning_now)); then
+        low_entered=0
         if ((low == 0)); then
             low=1
-            low_warning_now=1
+            low_entered=1
             printf 'Akkustand niedrig: %s%%.\n' "$charge"
-            if ((tts_enabled)); then
+        fi
+        if ((tts_enabled)); then
+            if ((low_entered == 1 || tts_every == 1)) ||
+                [[ -z "$last_low_warning_charge" || "$charge" != "$last_low_warning_charge" ]]; then
                 speak_text "$(make_low_warning_text)"
                 last_tts_charge=$charge
+                last_low_warning_charge=$charge
             fi
-            if [[ -n "$command" ]]; then
-                if ! DEVICE_ID="$device_id" BATTERY_LEVEL="$charge" BATTERY_CHARGING="$is_charging" \
-                    bash -c "$command"; then
-                    echo "Der konfigurierte Befehl ist mit einem Fehler beendet." >&2
-                fi
+        fi
+        if ((low_entered == 1)) && [[ -n "$command" ]]; then
+            if ! DEVICE_ID="$device_id" BATTERY_LEVEL="$charge" BATTERY_CHARGING="$is_charging" \
+                bash -c "$command"; then
+                echo "Der konfigurierte Befehl ist mit einem Fehler beendet." >&2
             fi
         fi
     else
         low=0
+        last_low_warning_charge=""
     fi
 
+    # Überladewarnung
     charge_warning_now=0
     if ((charge_limit > 0)) && [[ "$is_charging" == "true" ]] && ((charge >= charge_limit)); then
         charge_warning_now=1
     fi
 
     if ((charge_warning_now)); then
+        charge_warning_entered=0
         if ((charge_warning_active == 0)); then
             charge_warning_active=1
+            charge_warning_entered=1
             printf 'Ladewarnung: Der Akku ist bei %s%% (Ladelimit: %s%%) und lädt noch.\n' "$charge" "$charge_limit"
-            if ((tts_enabled)); then
+        fi
+        if ((tts_enabled)); then
+            if ((charge_warning_entered == 1 || tts_every == 1)) ||
+                [[ -z "$last_charge_warning_charge" || "$charge" != "$last_charge_warning_charge" ]]; then
                 speak_text "$(make_charge_warning_text)"
                 last_tts_charge=$charge
                 last_charge_warning_charge=$charge
             fi
-        elif ((tts_enabled == 1 && tts_every == 1)); then
-            speak_text "$(make_charge_warning_text)"
-            last_tts_charge=$charge
-            last_charge_warning_charge=$charge
-        elif ((tts_enabled == 1 && tts_every_percent == 1)) &&
-            [[ -z "$last_charge_warning_charge" || "$charge" != "$last_charge_warning_charge" ]]; then
-            speak_text "$(make_charge_warning_text)"
-            last_tts_charge=$charge
-            last_charge_warning_charge=$charge
         fi
     else
         charge_warning_active=0
         last_charge_warning_charge=""
     fi
 
+    # Die normale Statusansage bleibt gesperrt, solange eine Warnung gilt. Sonst
+    # sprächen bei --tts-every der Warnblock und der Statusblock dasselbe.
     should_speak=0
     if ((tts_enabled == 1 && charge_warning_now == 0 && low_warning_now == 0)); then
         if ((tts_every)); then

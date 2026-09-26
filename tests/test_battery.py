@@ -380,6 +380,40 @@ def test_unterladewarnung_einmal(sandbox):
 
 
 @pytest.mark.loop
+def test_unterladewarnung_wiederholt_bei_prozentwechsel(sandbox):
+    # Standard: Die Warnung folgt dem Ladestand, nicht dem Eintritt. Ohne
+    # Wiederholung wäre nach der ersten Minute nur noch die Statuszeile zu
+    # sehen, und die Warnung selbst längst vorbei.
+    sandbox.set_status("10 false", "9 false", "9 false")
+
+    sandbox.start_battery("--interval", "1", "-d", DEVICE, *tts(sandbox))
+    sandbox.wait_battery()
+
+    assert sandbox.tts_texts() == [
+        "Warning. The battery level is only 10 percent.",
+        "Warning. The battery level is only 9 percent.",
+    ], "Nur beim Eintritt und beim Prozentwechsel"
+
+
+@pytest.mark.loop
+def test_unterladewarnung_konsole_und_befehl_nur_einmal(sandbox):
+    # Die Wiederholung gilt nur für die Ansage. Die Konsolenmeldung und der
+    # Befehl melden den Eintritt, denn beides läuft sonst bei jedem Prozent
+    # erneut. Der aktuelle Stand steht ohnehin in der Statuszeile.
+    sandbox.set_status("10 false", "9 false", "8 false")
+
+    sandbox.start_battery(
+        "--interval", "1", "-d", DEVICE, *tts(sandbox), *command(sandbox)
+    )
+    result = sandbox.wait_battery()
+
+    assert result.stdout.count("Akkustand niedrig: 10%.") == 1, result.describe()
+    assert "Akkustand niedrig: 9%." not in result.stdout, result.describe()
+    assert sandbox.command_rows() == [[DEVICE, "10", "false"]], sandbox.command_rows()
+    assert sandbox.tts_count() == 3, sandbox.tts_texts()
+
+
+@pytest.mark.loop
 def test_unterladewarnung_wieder_nach_erholung(sandbox):
     sandbox.set_status("10 false", "50 false", "10 false")
 
@@ -592,7 +626,22 @@ def test_ladewarnung_wiederholt_bei_tts_every(sandbox):
 
 
 @pytest.mark.loop
+def test_ladewarnung_wiederholt_je_prozentwechsel_standard(sandbox):
+    # Standard wie bei der Unterladewarnung: Jede Ansage nennt den aktuellen
+    # Stand, damit während des Ladens erkennbar bleibt, wo man gerade steht.
+    # Ohne --tts-every-percent.
+    sandbox.set_status("85 true", "86 true", "86 true")
+
+    sandbox.start_battery("--interval", "1", "-d", DEVICE, *tts(sandbox))
+    sandbox.wait_battery()
+
+    assert sandbox.tts_texts() == [ladewarnung(85, 80), ladewarnung(86, 80)], sandbox.tts_texts()
+
+
+@pytest.mark.loop
 def test_ladewarnung_wiederholt_nur_bei_prozentwechsel(sandbox):
+    # --tts-every-percent ändert an den Warnungen nichts: Sie wiederholen sich
+    # ohne die Option genauso wie mit ihr.
     sandbox.set_status("85 true", "86 true", "86 true")
 
     sandbox.start_battery("--interval", "1", "--tts-every-percent", "-d", DEVICE, *tts(sandbox))

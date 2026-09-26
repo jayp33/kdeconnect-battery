@@ -66,11 +66,13 @@ Schwellenwert und Abfrageintervall ändern:
     --interval 30
 ```
 
-Die Meldung wird nur einmal ausgelöst, solange der Akkustand unterhalb der Schwelle bleibt. Nach dem Laden über der Schwelle oder während des Ladens wird sie wieder zurückgesetzt.
+Die Meldung wird nur einmal ausgelöst, solange der Akkustand unterhalb der Schwelle bleibt. Nach dem Laden über der Schwelle oder während des Ladens wird sie wieder zurückgesetzt. Per Sprachausgabe wird die Warnung dagegen bei jeder Prozentänderung wiederholt, siehe [Sprachansage](#sprachansage-tts).
 
 ## Sprachansage (TTS)
 
 TTS ist standardmäßig deaktiviert. Mit `--tts` werden standardmäßig nur Warnungen vorgelesen: Unterladewarnungen, Überladewarnungen und Verbindungsänderungen. Normale Statusansagen werden nicht gesprochen.
+
+Warnungen werden dabei nicht nur beim Eintritt in den Warnzustand gesprochen, sondern bei jeder Änderung des Prozentwerts wiederholt, jeweils mit dem aktuellen Stand. Ohne Prozentänderung bleibt es still, sonst würde alle 60 Sekunden dasselbe gesprochen.
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --tts
@@ -82,13 +84,13 @@ Bei einem niedrigen Akkustand lautet die englische Warnansage beispielsweise:
 Warning. The battery level is only 15 percent.
 ```
 
-Die Unterladewarnung wird gesprochen, wenn der Gerätestatus in den Warnbereich wechselt. Ein kurzer Test funktioniert mit:
+Die Unterladewarnung wird gesprochen, wenn der Gerätestatus in den Warnbereich wechselt, und bei jeder weiteren Änderung des Prozentwerts wiederholt. Ein kurzer Test funktioniert mit:
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --once --tts
 ```
 
-Mit `--tts-every-percent` werden zusätzlich normale Statusansagen beim ersten Ablesen und bei jeder Änderung des Prozentwerts ausgegeben. Ein Wechsel des Ladezustands allein genügt dabei nicht:
+Mit `--tts-every-percent` werden zusätzlich normale Statusansagen beim ersten Ablesen und bei jeder Änderung des Prozentwerts ausgegeben. Ein Wechsel des Ladezustands allein genügt dabei nicht. An den Warnungen ändert die Option nichts, die wiederholen sich bereits so:
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --tts-every-percent
@@ -101,7 +103,7 @@ Die Standardsprache ist Englisch. Eine britische Stimme oder Deutsch kann mit `-
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --tts --tts-language de
 ```
 
-Mit `--tts-every` wird bei jedem Abfrageintervall gesprochen. Das ist bei kurzen Intervallen entsprechend aufdringlich:
+Mit `--tts-every` wird auch ohne Änderung des Prozentwerts bei jedem Abfrageintervall gesprochen, auch von den Warnungen. Das ist bei kurzen Intervallen entsprechend aufdringlich:
 
 ```bash
 ./kdeconnect-battery.sh --device <GERÄTE-ID> --tts-every --interval 60
@@ -139,7 +141,7 @@ Die englische Ansage nennt den aktuellen Ladestand und das Limit, zum Beispiel:
 Warning. The battery is at 85 percent, above the 80 percent limit, and is still charging. You can stop charging now.
 ```
 
-Die Terminalmeldung erscheint pro Episode einmal. Wird die Warnung wiederholt, nennt jede Ansage den jeweils aktuellen Ladestand: mit `--tts-every` bei jedem Abfrageintervall, mit `--tts-every-percent` bei jeder Änderung des Prozentwerts. Die Warnung wird zurückgesetzt, wenn das Gerät vom Ladegerät getrennt wird oder der Ladestand wieder unterhalb des Limits liegt. Das Skript beendet das Laden nicht selbst, sondern informiert lediglich über den erreichten Grenzwert.
+Die Terminalmeldung erscheint pro Episode einmal. Gesprochen wird die Warnung dagegen bei jeder Änderung des Prozentwerts, und jede Ansage nennt den dann aktuellen Ladestand; mit `--tts-every` bei jedem Abfrageintervall. Die Warnung wird zurückgesetzt, wenn das Gerät vom Ladegerät getrennt wird oder der Ladestand wieder unterhalb des Limits liegt. Das Skript beendet das Laden nicht selbst, sondern informiert lediglich über den erreichten Grenzwert.
 
 Die Unterladewarnung nutzt dagegen `--threshold` (Standard: 20 Prozent). Mit `--threshold 0` wird sie deaktiviert. So lassen sich beide Warnungen unabhängig kombinieren:
 

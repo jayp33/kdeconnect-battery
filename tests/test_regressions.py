@@ -138,6 +138,31 @@ def test_ladewarnung_nennt_stand_und_limit(sandbox):
     ), sandbox.tts_texts()
 
 
+@pytest.mark.loop
+def test_warnung_spricht_nicht_zusaetzlich_als_status(sandbox):
+    """Fehler: Die Wiederholung der Warnungen kam über die Statusansage, weil
+    nur der Warnblock beim Eintritt sprach. Bei --tts sprach die Unterladewarnung
+    dadurch gar nicht mehr. Nach der Umstellung auf den Warnblock hätte die
+    Sperre der Statusansage entfallen können, dann sprächen bei --tts-every
+    beide Blöcke denselben Text."""
+    sandbox.set_status("10 false", "9 false", "85 true", "86 true")
+
+    sandbox.start_battery(
+        "-d", DEVICE, "--interval", "1", "--tts-every",
+        "--tts-command", str(sandbox.bin / "fake-tts"),
+    )
+    sandbox.wait_battery()
+
+    assert sandbox.tts_texts() == [
+        "Warning. The battery level is only 10 percent.",
+        "Warning. The battery level is only 9 percent.",
+        "Warning. The battery is at 85 percent, above the 80 percent limit, "
+        "and is still charging. You can stop charging now.",
+        "Warning. The battery is at 86 percent, above the 80 percent limit, "
+        "and is still charging. You can stop charging now.",
+    ], sandbox.tts_texts()
+
+
 @pytest.mark.parametrize(
     ("args", "expected"),
     [
