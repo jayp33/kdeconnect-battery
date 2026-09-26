@@ -303,29 +303,12 @@ Das Skript liest den Akkustand des **entfernten Geräts**. Für den Akku des lok
 
 ## Tests
 
-Beide Skripte sind mit einer Testsuite abgesichert. Sie braucht nur Python mit `pytest`; Hilfsprogramme wie `gdbus`, `kdeconnect-cli` oder Sprachausgabe liefert die Suite selbst als Attrappen mit (`tests/fakes/bin`). Jeder Test läuft in einem eigenen temporären Verzeichnis mit eigenem `PATH` und eigenem `HOME`. Weder echte Geräte noch die Benutzerumgebung können ein Testergebnis beeinflussen, und kein Test erzeugt Ton.
+Beide Skripte sind mit einer Testsuite abgesichert. Sie braucht nur Python mit `pytest`; Hilfsprogramme wie `gdbus`, `kdeconnect-cli` oder Sprachausgabe liefert die Suite selbst als Attrappen mit. Jeder Test läuft in einem eigenen temporären Verzeichnis mit eigenem `PATH` und eigenem `HOME`. Weder echte Geräte noch die Benutzerumgebung können ein Testergebnis beeinflussen, und kein Test erzeugt Ton.
 
 ```bash
-python3 -m venv .venv                              # einmalig
-.venv/bin/pip install -r tests/requirements.txt     # einmalig
-.venv/bin/pytest                                   # alle Tests
-
-.venv/bin/pytest tests/test_battery.py             # nur eine Datei
-.venv/bin/pytest -k ladewarnung                    # nur Tests, deren Name das Muster enthält
-.venv/bin/pytest -m loop                           # nur die Tests mit Endlosschleife
+python3 -m venv .venv                          # einmalig
+.venv/bin/pip install -r tests/requirements.txt # einmalig
+.venv/bin/pytest                               # alle Tests
 ```
 
-| Datei | Inhalt |
-| --- | --- |
-| `tests/harness.py` | Die Klasse `Sandbox`: Verzeichnisse, Umgebung, Attrappen, Skriptaufrufe |
-| `tests/conftest.py` | Die Fixture `sandbox` |
-| `tests/fakes/bin/` | Attrappen als ausführbare Shell-Skripte |
-| `tests/test_battery.py` | `kdeconnect-battery.sh`: Optionen, D-Bus-Auswertung, Warnungen, Sprachausgabe, Geräteauswahl, Schleife |
-| `tests/test_desktops.py` | `kdeconnect-battery-desktops.sh`: Hilfe, Geräteliste, erzeugte Dateien, Wertetabelle, Dateinamen, Start der erzeugten Befehle |
-| `tests/test_regressions.py` | Fehler, die schon einmal aufgetreten sind, mit dem Grund im Kommentar |
-
-Die Suite läuft in etwa anderthalb Minuten. Der größte Teil davon entsteht durch die Tests mit Endlosschleife: Sie warten im Abstand von einer Sekunde mehrere Abfragen ab, um Wiederholungen und Zustandswechsel zu prüfen.
-
-`pyproject.toml` setzt eine harte Zeitbegrenzung von 120 Sekunden je Test. Ein Skript, das sich nicht beendet, lässt den Test scheitern statt den ganzen Lauf aufzuhängen.
-
-Die Prüfung der erzeugten Desktop-Dateien mit `desktop-file-validate` wird übersprungen, falls das Programm fehlt.
+Ein Lauf dauert etwa anderthalb Minuten. Aufbau der Suite, das Auswählen einzelner Tests und Beispiele zum Schreiben neuer Tests stehen in [tests/README.md](tests/README.md).

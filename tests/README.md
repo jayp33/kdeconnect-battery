@@ -19,6 +19,9 @@ beendet, lässt den Test also scheitern statt den ganzen Lauf aufzuhängen. Wer
 einen Test einzeln laufen lässt und mehr Zeit braucht, erhöht das mit
 `--timeout 300`.
 
+Ohne installiertes `desktop-file-validate` wird die Prüfung der erzeugten
+Desktop-Dateien übersprungen; die Tests laufen trotzdem durch.
+
 ## Aufbau
 
 | Datei | Inhalt |
